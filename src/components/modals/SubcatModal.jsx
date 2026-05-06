@@ -191,7 +191,9 @@ function BarChart({ monthly, months, vista }) {
   )
 }
 
-// ─── Daily cumulative line chart (current vs previous month) ─────────────────
+// ─── Daily bar chart (current vs previous month) ─────────────────────────────
+// Bars = units sold that specific day → weekly pattern is visible
+// Tooltip = day value + running cumulative for both months
 
 function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
   const [hoverIdx, setHoverIdx] = useState(null)
@@ -210,23 +212,42 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
 
   const days = Array.from({ length: nDays }, (_, i) => i + 1)
 
+  // Cumulative — only for tooltip display
   let cc = 0, pc = 0
   const currCum = days.map(d => { cc += currDays[d] || 0; return cc })
   const prevCum = days.map(d => { pc += prevDays[d] || 0; return pc })
 
-  const maxVal = Math.max(...currCum, ...prevCum, 1)
   const hasPrev = prevCum.some(v => v > 0)
 
-  const CH = 100, PAD = { top: 28, right: 20, bottom: 34, left: 10 }
+  // Scale to DAILY values (not cumulative) so weekly spikes are visible
+  const allDailyVals = [
+    ...days.map(d => currDays[d] || 0),
+    ...days.map(d => prevDays[d] || 0),
+  ]
+  const maxVal = Math.max(...allDailyVals, 1)
+
+  const CH = 100, PAD = { top: 14, right: 20, bottom: 34, left: 10 }
   const W = 520, VH = PAD.top + CH + PAD.bottom
   const CW = W - PAD.left - PAD.right
-  const colW = CW / (nDays - 1)
 
-  const xOf = d => PAD.left + ((d - 1) / (nDays - 1)) * CW
-  const yOf = v => PAD.top + CH - (v / maxVal) * CH
+  // Bar width leaves a small gap between bars
+  const bW   = Math.max(2, Math.floor(CW / nDays) - 2)
+  const xOf  = d => PAD.left + ((d - 1) / nDays) * CW + (CW / nDays - bW) / 2
+  const yOf  = v => PAD.top + CH - (v / maxVal) * CH
+  const colW = CW / nDays
 
-  const makePath = cums =>
-    cums.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xOf(days[i])} ${yOf(v)}`).join(' ')
+  // Prev-month line using daily values
+  const makePrevPath = () => {
+    let d = ''; let on = false
+    days.forEach((day, i) => {
+      const v = prevDays[day] || 0
+      const x = xOf(day) + bW / 2
+      const y = yOf(v)
+      if (v > 0) { d += `${on ? 'L' : 'M'} ${x} ${y} `; on = true }
+      else on = false
+    })
+    return d
+  }
 
   const fmtV = v => vista === '$$$'
     ? (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`)
@@ -238,17 +259,16 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
     ? format(new Date(+prevYm.split('-')[0], +prevYm.split('-')[1] - 1, 1), 'MMM', { locale: es })
     : null
 
-  // Which days get an axis label
   const xLabelDays = [...new Set([1, ...days.filter(d => d % 5 === 0), nDays])]
-  // Which days get an inline cumulative label (hide if currently hovered)
-  const cumLabelSet = new Set([5, 10, 15, 20, 25, nDays])
+
+  const prevPath = makePrevPath()
 
   return (
     <div className="relative select-none" onMouseLeave={() => setHoverIdx(null)}>
       {/* Legend */}
       <div className="flex items-center gap-4 mb-1.5 justify-end">
         <div className="flex items-center gap-1.5 text-[10px] text-gray-700 font-semibold">
-          <div className="w-5 h-[2px] rounded bg-[#b45309]" />
+          <div className="w-5 h-3 rounded-sm bg-[#b45309] opacity-80" />
           <span className="capitalize">{currMonLabel}</span>
         </div>
         {hasPrev && prevMonLabel && (
@@ -274,72 +294,51 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
         <line x1={PAD.left} y1={PAD.top + CH} x2={PAD.left + CW} y2={PAD.top + CH}
           stroke="#e5e7eb" strokeWidth={1} />
 
-        {/* Prev area + line */}
-        {hasPrev && prevCum.some(v => v > 0) && (
-          <>
-            <path d={`${makePath(prevCum)} L ${xOf(nDays)} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
-              fill="#f59e0b" fillOpacity={0.05} />
-            <path d={makePath(prevCum)} fill="none" stroke="#f59e0b" strokeWidth={1.5}
-              strokeDasharray="5,3" strokeOpacity={0.75} strokeLinejoin="round" strokeLinecap="round" />
-          </>
+        {/* Current month bars */}
+        {days.map((d, i) => {
+          const val  = currDays[d] || 0
+          const bH   = val > 0 ? Math.max(2, (val / maxVal) * CH) : 0
+          const x    = xOf(d)
+          const isHov = hoverIdx === i
+          if (!bH) return null
+          return (
+            <rect key={d}
+              x={x} y={PAD.top + CH - bH} width={bW} height={bH} rx={1.5}
+              fill={isHov ? '#92400e' : '#b45309'} fillOpacity={isHov ? 1 : 0.82}
+            />
+          )
+        })}
+
+        {/* Prev month line overlay */}
+        {hasPrev && prevPath && (
+          <path d={prevPath} fill="none" stroke="#f59e0b" strokeWidth={1.5}
+            strokeDasharray="4,2.5" strokeOpacity={0.8}
+            strokeLinejoin="round" strokeLinecap="round" />
         )}
 
-        {/* Current area + line */}
-        {currCum.some(v => v > 0) && (
-          <>
-            <path d={`${makePath(currCum)} L ${xOf(nDays)} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
-              fill="#b45309" fillOpacity={0.08} />
-            <path d={makePath(currCum)} fill="none" stroke="#b45309" strokeWidth={2}
-              strokeLinejoin="round" strokeLinecap="round" />
-          </>
-        )}
+        {/* Prev month dots */}
+        {hasPrev && days.map((d, i) => {
+          const v = prevDays[d] || 0
+          if (!v) return null
+          const x = xOf(d) + bW / 2
+          const y = yOf(v)
+          return (
+            <circle key={d} cx={x} cy={y} r={hoverIdx === i ? 3 : 1.8}
+              fill="#f59e0b" stroke="white" strokeWidth={1} fillOpacity={0.85} />
+          )
+        })}
 
         {/* Hover crosshair */}
         {hoverIdx !== null && (
           <line
-            x1={xOf(days[hoverIdx])} y1={PAD.top}
-            x2={xOf(days[hoverIdx])} y2={PAD.top + CH}
+            x1={xOf(days[hoverIdx]) + bW / 2} y1={PAD.top}
+            x2={xOf(days[hoverIdx]) + bW / 2} y2={PAD.top + CH}
             stroke="#d1d5db" strokeWidth={1} strokeDasharray="3,2" />
         )}
 
-        {/* Dots + inline cumulative labels */}
-        {days.map((d, i) => {
-          const cx    = xOf(d)
-          const cy    = yOf(currCum[i])
-          const pyVal = prevCum[i]
-          const py    = pyVal > 0 ? yOf(pyVal) : null
-          const isLast = i === days.length - 1
-          const isHov  = hoverIdx === i
-          const showLbl = cumLabelSet.has(d) && currCum[i] > 0 && !isHov
-
-          return (
-            <g key={d}>
-              {currCum[i] > 0 && (
-                <circle cx={cx} cy={cy} r={isHov || isLast ? 4.5 : 2.5}
-                  fill="#b45309" stroke="white" strokeWidth={isHov ? 2 : 1.5} />
-              )}
-              {hasPrev && pyVal > 0 && py !== null && (
-                <circle cx={cx} cy={py} r={isHov ? 3.5 : 2}
-                  fill="#f59e0b" stroke="white" strokeWidth={isHov ? 1.5 : 1} fillOpacity={0.85} />
-              )}
-              {showLbl && (
-                <text x={cx} y={cy - 8} textAnchor={isLast ? 'end' : 'middle'}
-                  fill="#78350f" fontSize={8} fontWeight="700">
-                  {fmtV(currCum[i])}
-                </text>
-              )}
-              {isLast && hasPrev && pyVal > 0 && py !== null && !isHov && (
-                <text x={cx} y={py - 8} textAnchor="end" fill="#d97706" fontSize={7} fontWeight="600">
-                  {fmtV(pyVal)}
-                </text>
-              )}
-            </g>
-          )
-        })}
-
         {/* X axis ticks + labels */}
         {xLabelDays.map(d => {
-          const x       = xOf(d)
+          const x       = xOf(d) + bW / 2
           const isFirst = d === 1
           const isLast  = d === nDays
           const anchor  = isFirst ? 'start' : isLast ? 'end' : 'middle'
@@ -359,10 +358,10 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
           )
         })}
 
-        {/* Invisible hover columns for mouse events */}
+        {/* Invisible hover columns */}
         {days.map((d, i) => (
           <rect key={`h${d}`}
-            x={Math.max(PAD.left, xOf(d) - colW / 2)}
+            x={PAD.left + i * colW}
             y={PAD.top} width={colW} height={CH}
             fill="transparent"
             onMouseEnter={() => setHoverIdx(i)} />
@@ -371,13 +370,13 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
 
       {/* Tooltip */}
       {hoverIdx !== null && (() => {
-        const d    = days[hoverIdx]
-        const cDay = currDays[d] || 0
-        const pDay = prevDays[d] || 0
-        const cCum = currCum[hoverIdx]
-        const pCum = prevCum[hoverIdx]
+        const d       = days[hoverIdx]
+        const cDay    = currDays[d] || 0
+        const pDay    = prevDays[d] || 0
+        const cCum    = currCum[hoverIdx]
+        const pCum    = prevCum[hoverIdx]
         const onRight = hoverIdx > nDays * 0.55
-        const dateLabel = format(new Date(cy0, cm0 - 1, d), "d 'de' MMMM", { locale: es })
+        const dateLabel = format(new Date(cy0, cm0 - 1, d), "EEE d 'de' MMMM", { locale: es })
 
         return (
           <div className={`absolute top-7 pointer-events-none z-20 bg-white border border-gray-100 rounded-xl shadow-lg px-3 py-2.5 min-w-[155px] ${onRight ? 'right-2' : 'left-2'}`}>
@@ -516,7 +515,7 @@ function ProductoDetalle({ prod, months, maxDayInCurrent }) {
       {maxDayInCurrent > 0 && (
         <div className="px-6 pt-3 pb-3 border-b bg-white">
           <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1.5">
-            Acumulado diario — {vista === '$$$' ? 'monto' : 'unidades'}
+            Ventas por día — {vista === '$$$' ? 'monto' : 'unidades'}
           </p>
           <DailyLineChart
             prod={prod}
