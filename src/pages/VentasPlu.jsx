@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useVentasPlu } from '../hooks/useVentasPlu'
+import { supabase } from '../lib/supabase'
 import MonthPicker from '../components/ui/MonthPicker'
 import SubcatModal from '../components/modals/SubcatModal'
 import RegistrarDiaModal   from '../components/modals/RegistrarDiaModal'
@@ -196,9 +197,20 @@ function SubcatTable({ titulo, data, onRowClick }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function VentasPlu() {
-  const [mes, setMes]     = useState(new Date())
-  const [modal, setModal] = useState(null)
-  const [subcat, setSubcat] = useState(null)  // { subcat, categoria }
+  const [mes, setMes]       = useState(new Date())
+  const [modal, setModal]   = useState(null)
+  const [subcat, setSubcat] = useState(null)
+  const [ultimaFecha, setUltimaFecha] = useState(null)
+
+  useEffect(() => {
+    supabase
+      .from('ventas_plu')
+      .select('fecha')
+      .order('fecha', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => { if (data) setUltimaFecha(data.fecha) })
+  }, [])
 
   const { bebidas, alimentos, bTotales, aTotales, loading, error } = useVentasPlu(mes)
 
@@ -217,7 +229,9 @@ export default function VentasPlu() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Ventas por PLU</h1>
-            <p className="text-xs text-gray-400 mt-0.5 capitalize">{mesLabel} · datos al {toLabel(new Date())}</p>
+            <p className="text-xs text-gray-400 mt-0.5 capitalize">
+              {mesLabel} · datos al {ultimaFecha ? toLabel(new Date(ultimaFecha + 'T12:00')) : '…'}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => setModal(MODAL.REGISTRAR)} className={btnClass}>

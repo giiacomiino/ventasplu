@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useProductos } from '../../hooks/useProductos'
 import Modal from '../ui/Modal'
 import { format } from 'date-fns'
-import { Pencil, Check, X, Plus, History } from 'lucide-react'
+import { Pencil, Check, X, Plus, History, Trash2 } from 'lucide-react'
 
 // Calcula vigente_hasta de cada precio a partir del siguiente
 function preciosConRango(precios) {
@@ -27,7 +27,7 @@ function diaAntes(isoStr) {
 }
 
 export default function ListaProductosModal({ onClose }) {
-  const { productos, loading, precioVigente, actualizarPrecio, agregarProducto } = useProductos()
+  const { productos, loading, precioVigente, actualizarPrecio, agregarProducto, eliminarProducto } = useProductos()
   const [editando, setEditando]       = useState(null)
   const [nuevoPrecio, setNuevo]       = useState('')
   const [nuevaFecha, setNuevaFecha]   = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -35,6 +35,7 @@ export default function ListaProductosModal({ onClose }) {
   const [historialAbierto, setHistorialAbierto] = useState(new Set())
   const [nuevoP, setNuevoP]           = useState({ nombre: '', subcategoria: '', categoria: 'Alimentos' })
   const [saving, setSaving]           = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null) // producto id
 
   const toggleHistorial = (id) => setHistorialAbierto(prev => {
     const next = new Set(prev)
@@ -48,6 +49,13 @@ export default function ListaProductosModal({ onClose }) {
     await actualizarPrecio(editando, nuevoPrecio, nuevaFecha)
     setEditando(null)
     setNuevo('')
+    setSaving(false)
+  }
+
+  const handleEliminar = async (id) => {
+    setSaving(true)
+    await eliminarProducto(id)
+    setConfirmDelete(null)
     setSaving(false)
   }
 
@@ -158,29 +166,51 @@ export default function ListaProductosModal({ onClose }) {
                     </td>
 
                     <td className="px-4 py-2.5 text-right">
-                      <div className="flex gap-1 justify-end">
-                        {/* Historial de precios */}
-                        {rangos.length > 1 && (
-                          <button onClick={() => toggleHistorial(p.id)}
-                            title="Ver historial de precios"
-                            className={`p-1 rounded transition-colors ${
-                              histOpen ? 'text-gold-600 bg-gold-50' : 'text-gray-300 hover:text-gold-500'
-                            }`}>
-                            <History size={13} />
+                      {confirmDelete === p.id ? (
+                        <div className="flex gap-1 justify-end items-center">
+                          <span className="text-xs text-red-500 mr-1">¿Borrar?</span>
+                          <button onClick={() => handleEliminar(p.id)} disabled={saving}
+                            className="px-2 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50">
+                            Sí
                           </button>
-                        )}
-                        {/* Editar precio */}
-                        {!isEditing && (
-                          <button onClick={() => {
-                            setEditando(p.id)
-                            setNuevo(pv?.precio?.toString() || '')
-                            setNuevaFecha(format(new Date(), 'yyyy-MM-dd'))
-                          }}
-                            className="p-1 text-gold-600 hover:text-gold-800 transition-colors">
-                            <Pencil size={13} />
+                          <button onClick={() => setConfirmDelete(null)}
+                            className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200">
+                            No
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1 justify-end">
+                          {/* Historial de precios */}
+                          {rangos.length > 1 && (
+                            <button onClick={() => toggleHistorial(p.id)}
+                              title="Ver historial de precios"
+                              className={`p-1 rounded transition-colors ${
+                                histOpen ? 'text-gold-600 bg-gold-50' : 'text-gray-300 hover:text-gold-500'
+                              }`}>
+                              <History size={13} />
+                            </button>
+                          )}
+                          {/* Editar precio */}
+                          {!isEditing && (
+                            <button onClick={() => {
+                              setEditando(p.id)
+                              setNuevo(pv?.precio?.toString() || '')
+                              setNuevaFecha(format(new Date(), 'yyyy-MM-dd'))
+                            }}
+                              className="p-1 text-gold-600 hover:text-gold-800 transition-colors">
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                          {/* Borrar producto */}
+                          {!isEditing && (
+                            <button onClick={() => setConfirmDelete(p.id)}
+                              title="Borrar producto"
+                              className="p-1 text-gray-300 hover:text-red-400 transition-colors">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>,
 

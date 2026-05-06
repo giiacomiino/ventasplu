@@ -44,5 +44,11 @@ export function useProductos() {
     return error
   }
 
-  return { productos, loading, precioVigente, actualizarPrecio, agregarProducto, refetch: fetchProductos }
+  const eliminarProducto = async (id) => {
+    const { error } = await supabase.from('productos').update({ activo: false }).eq('id', id)
+    if (!error) fetchProductos()
+    return error
+  }
+
+  return { productos, loading, precioVigente, actualizarPrecio, agregarProducto, eliminarProducto, refetch: fetchProductos }
 }
