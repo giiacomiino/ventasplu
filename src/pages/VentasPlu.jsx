@@ -68,12 +68,14 @@ function DonutChart({ data, onSliceClick }) {
   if (!total) return <p className="text-xs text-gray-300 text-center py-4">Sin datos</p>
 
   const R = 60, ri = 36, cx = 68, cy = 68
+  const rMid = (R + ri) / 2
   let angle = -Math.PI / 2
 
   const slices = data.map((row, i) => {
     const val = Number(row.unidades || 0)
     const pct = val / total
     const s = angle, e = angle + pct * 2 * Math.PI
+    const mid = (s + e) / 2
     angle = e
     const large = pct > 0.5 ? 1 : 0
     const d = [
@@ -83,7 +85,7 @@ function DonutChart({ data, onSliceClick }) {
       `A ${ri} ${ri} 0 ${large} 0 ${cx + ri * Math.cos(s)} ${cy + ri * Math.sin(s)}`,
       'Z',
     ].join(' ')
-    return { ...row, d, pct, color: PALETTE[i % PALETTE.length], idx: i }
+    return { ...row, d, pct, mid, color: PALETTE[i % PALETTE.length], idx: i }
   })
 
   return (
@@ -99,6 +101,17 @@ function DonutChart({ data, onSliceClick }) {
             onMouseLeave={() => setHover(null)}
             onClick={() => onSliceClick(s.subcategoria)}
           />
+        ))}
+        {/* Slice % labels — only for slices >= 8% */}
+        {slices.map(s => s.pct >= 0.08 && (
+          <text key={`lbl-${s.subcategoria}`}
+            x={cx + rMid * Math.cos(s.mid)}
+            y={cy + rMid * Math.sin(s.mid) + 3}
+            textAnchor="middle" fill="white"
+            fontSize={7.5} fontWeight="700"
+            style={{ pointerEvents: 'none' }}>
+            {(s.pct * 100).toFixed(0)}%
+          </text>
         ))}
         {/* Center */}
         <text x={cx} y={cx - 7} textAnchor="middle" fill="#374151" fontSize={13} fontWeight="700">
@@ -121,9 +134,11 @@ function DonutChart({ data, onSliceClick }) {
           >
             <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: s.color }} />
             <span className="text-gray-600 truncate flex-1">{s.subcategoria}</span>
-            <span className="text-gray-400 tabular-nums">{(s.pct * 100).toFixed(1)}%</span>
+            <span className="text-gray-700 font-semibold tabular-nums">{Number(s.unidades).toLocaleString('es-MX')}</span>
+            <span className="text-gray-400 tabular-nums w-10 text-right">{(s.pct * 100).toFixed(1)}%</span>
           </div>
         ))}
+        <p className="text-[10px] text-gray-300 pt-0.5 pl-1">% por unidades</p>
       </div>
     </div>
   )
