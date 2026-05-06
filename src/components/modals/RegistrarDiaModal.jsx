@@ -133,11 +133,12 @@ function VistaCaptura({ fecha, onGuardado }) {
   const handleUnidades = (id, valor) => {
     setFilas(prev => prev.map(f => {
       if (f.producto_id !== id) return f
+      const hasVal = valor !== ''
       const u = parseInt(valor) || 0
       return {
         ...f,
         unidades: valor,
-        _monto: f._precio != null && u > 0 ? Math.round(u * f._precio) : null,
+        _monto: hasVal && f._precio != null ? Math.round(u * f._precio) : null,
       }
     }))
   }
@@ -145,7 +146,7 @@ function VistaCaptura({ fecha, onGuardado }) {
   const handleGuardar = async () => {
     setSaving(true)
     const registros = filas
-      .filter(f => f.unidades !== '' && parseInt(f.unidades) > 0)
+      .filter(f => f.unidades !== '')
       .map(f => ({
         producto_id:    f.producto_id,
         fecha,
@@ -219,8 +220,8 @@ function VistaCaptura({ fecha, onGuardado }) {
                   />
                 </td>
                 <td className="px-4 py-1.5 text-right">
-                  <span className={`text-sm tabular-nums font-medium ${f._monto ? 'text-gray-800' : 'text-gray-200'}`}>
-                    {f._monto ? `$${f._monto.toLocaleString('es-MX')}` : '—'}
+                  <span className={`text-sm tabular-nums font-medium ${f._monto != null ? 'text-gray-800' : 'text-gray-200'}`}>
+                    {f._monto != null ? `$${f._monto.toLocaleString('es-MX')}` : '—'}
                   </span>
                 </td>
               </tr>
