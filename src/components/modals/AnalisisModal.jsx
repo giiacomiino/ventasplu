@@ -2,8 +2,8 @@ import { useState } from 'react'
 import Modal from '../ui/Modal'
 import { useHistorial } from '../../hooks/useHistorial'
 import { formatMoney, formatUnits } from '../../utils/formatters'
-import { ChevronRight, ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react'
-import { format } from 'date-fns'
+import { ChevronRight, ArrowLeft, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const COLORS = ['#7a6020','#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899']
@@ -223,7 +223,7 @@ function ProgressRow({ label, value, total, color, onClick }) {
 
 // ─── NIVEL 0 — Overview general ───────────────────────────────────────────────
 
-function VistaOverview({ tree, months, vista, onDrill }) {
+function VistaOverview({ tree, months, vista, onDrill, missingData = [] }) {
   const bebMonthly = catMonthlyFrom(tree, 'Bebidas', months)
   const aliMonthly = catMonthlyFrom(tree, 'Alimentos', months)
 
@@ -324,6 +324,49 @@ function VistaOverview({ tree, months, vista, onDrill }) {
           )
         })}
       </div>
+
+      {/* ── Datos faltantes ── */}
+      {missingData.length === 0 ? (
+        <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl px-5 py-4 flex items-center gap-3">
+          <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <span className="text-emerald-600 text-sm font-bold">✓</span>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-emerald-700">Sin datos faltantes</p>
+            <p className="text-xs text-emerald-600/70">Todos los productos tienen registros completos para el mes actual.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-red-50/40 border border-red-100 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-red-100">
+            <AlertCircle size={14} className="text-red-400 flex-shrink-0" />
+            <p className="text-sm font-bold text-red-600 flex-1">
+              Días sin registrar — {format(parseISO(months.at(-1) + '-01'), 'MMMM yyyy', { locale: es })}
+            </p>
+            <span className="text-[10px] font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">
+              {missingData.length} producto{missingData.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="divide-y divide-red-50">
+            {missingData.map(({ id, nombre, subcategoria, missingDates }) => (
+              <div key={id} className="flex items-start gap-4 px-5 py-3">
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <span className="text-sm font-semibold text-gray-700">{nombre}</span>
+                  <span className="text-xs text-gray-400 ml-2">{subcategoria}</span>
+                </div>
+                <div className="flex flex-wrap gap-1 justify-end max-w-[55%]">
+                  {missingDates.map(d => (
+                    <span key={d}
+                      className="text-[10px] font-bold text-red-500 bg-red-100 px-1.5 py-0.5 rounded tabular-nums whitespace-nowrap">
+                      {format(parseISO(d), 'd MMM', { locale: es })}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -633,8 +676,9 @@ export default function AnalisisModal({ onClose }) {
 
   const { data, loading, error } = useHistorial(numMeses)
 
-  const months     = data?.months || []
-  const tree       = data?.tree   || {}
+  const months      = data?.months      || []
+  const tree        = data?.tree        || {}
+  const missingData = data?.missingData || []
   const subcatNode = drill?.subcat    ? tree[drill.categoria]?.[drill.subcat]                         : null
   const prodNode   = drill?.productId ? subcatNode?.productos?.[drill.productId]                      : null
 
@@ -697,7 +741,7 @@ export default function AnalisisModal({ onClose }) {
       onBack={() => setDrill(null)}
       onDrill={subcat => go({ level: 'subcat', subcat })} />
   } else {
-    content = <VistaOverview tree={tree} months={months} vista={vista}
+    content = <VistaOverview tree={tree} months={months} vista={vista} missingData={missingData}
       onDrill={cat => setDrill({ level: 'category', categoria: cat })} />
   }
 

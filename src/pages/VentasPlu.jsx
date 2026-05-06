@@ -4,10 +4,9 @@ import MonthPicker from '../components/ui/MonthPicker'
 import SubcatModal from '../components/modals/SubcatModal'
 import RegistrarDiaModal   from '../components/modals/RegistrarDiaModal'
 import ListaProductosModal from '../components/modals/ListaProductosModal'
-import VerErroresModal     from '../components/modals/VerErroresModal'
 import AuditarDiaModal     from '../components/modals/AuditarDiaModal'
 import AnalisisModal       from '../components/modals/AnalisisModal'
-import { Plus, List, AlertCircle, Eye, BarChart2, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, List, Eye, BarChart2, TrendingUp, TrendingDown } from 'lucide-react'
 import { formatMoney, formatUnits } from '../utils/formatters'
 import { toLabel } from '../utils/dateHelpers'
 import { format } from 'date-fns'
@@ -21,7 +20,7 @@ const PALETTE = [
 
 const MODAL = {
   REGISTRAR: 'registrar', PRODUCTOS: 'productos',
-  ERRORES: 'errores', AUDITAR: 'auditar', ANALISIS: 'analisis',
+  AUDITAR: 'auditar', ANALISIS: 'analisis',
 }
 
 // ─── MoM badge ────────────────────────────────────────────────────────────────
@@ -227,9 +226,6 @@ export default function VentasPlu() {
             <button onClick={() => setModal(MODAL.PRODUCTOS)} className={btnClass}>
               <List size={15} /> Productos
             </button>
-            <button onClick={() => setModal(MODAL.ERRORES)} className={btnClass}>
-              <AlertCircle size={15} /> Errores
-            </button>
             <button onClick={() => setModal(MODAL.AUDITAR)} className={btnClass}>
               <Eye size={15} /> Auditar
             </button>
@@ -328,7 +324,6 @@ export default function VentasPlu() {
       {/* ── Modales ── */}
       {modal === MODAL.REGISTRAR && <RegistrarDiaModal   onClose={() => setModal(null)} />}
       {modal === MODAL.PRODUCTOS && <ListaProductosModal onClose={() => setModal(null)} />}
-      {modal === MODAL.ERRORES   && <VerErroresModal     onClose={() => setModal(null)} />}
       {modal === MODAL.AUDITAR   && <AuditarDiaModal     onClose={() => setModal(null)} />}
       {modal === MODAL.ANALISIS  && <AnalisisModal       onClose={() => setModal(null)} />}
 
