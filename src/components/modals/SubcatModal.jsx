@@ -191,6 +191,143 @@ function BarChart({ monthly, months, vista }) {
   )
 }
 
+// ─── Daily cumulative line chart (current vs previous month) ─────────────────
+
+function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
+  const k = vista === '$$$' ? 'monto' : 'unidades'
+
+  // Aggregate per day-of-month for current and previous month
+  const currDays = {}, prevDays = {}
+  for (const [date, dv] of Object.entries(prod.days)) {
+    const ym  = date.slice(0, 7)
+    const day = parseInt(date.slice(8, 10))
+    if (ym === currentYm) currDays[day] = (currDays[day] || 0) + (dv[k] || 0)
+    if (prevYm && ym === prevYm) prevDays[day] = (prevDays[day] || 0) + (dv[k] || 0)
+  }
+
+  const nDays = maxDayInCurrent || 1
+  const days  = Array.from({ length: nDays }, (_, i) => i + 1)
+
+  // Build cumulative series
+  let cc = 0, pc = 0
+  const currCum = days.map(d => { cc += currDays[d] || 0; return cc })
+  const prevCum = days.map(d => { pc += prevDays[d] || 0; return pc })
+
+  const maxVal = Math.max(...currCum, ...prevCum, 1)
+  const hasPrev = prevCum.some(v => v > 0)
+
+  const CH = 100, PAD = { top: 26, right: 20, bottom: 26, left: 10 }
+  const W = 520, VH = PAD.top + CH + PAD.bottom
+  const CW = W - PAD.left - PAD.right
+
+  const xOf = d => PAD.left + ((d - 1) / Math.max(nDays - 1, 1)) * CW
+  const yOf = v => PAD.top + CH - (v / maxVal) * CH
+
+  const path = cums =>
+    cums.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xOf(days[i])} ${yOf(v)}`).join(' ')
+
+  const fmtV = v => vista === '$$$'
+    ? (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`)
+    : (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))
+
+  const currLabel = format(new Date(+currentYm.split('-')[0], +currentYm.split('-')[1] - 1, 1), 'MMM', { locale: es })
+  const prevLabel = prevYm ? format(new Date(+prevYm.split('-')[0], +prevYm.split('-')[1] - 1, 1), 'MMM', { locale: es }) : null
+
+  // Show cumulative value label at day 5, 10, 15, 20, 25 and last day
+  const labelSet = new Set([5, 10, 15, 20, 25, nDays])
+
+  return (
+    <div>
+      {/* Legend */}
+      <div className="flex items-center gap-4 mb-1 justify-end">
+        <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold">
+          <div className="w-5 h-[2px] rounded bg-[#b45309]" /> {currLabel}
+        </div>
+        {hasPrev && prevLabel && (
+          <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+            <div className="w-5 h-[1.5px] rounded bg-[#f59e0b]" style={{ opacity: 0.7 }} /> {prevLabel}
+          </div>
+        )}
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${VH}`} className="w-full">
+        {/* Grid lines */}
+        {[0.25, 0.5, 0.75, 1].map(f => (
+          <line key={f}
+            x1={PAD.left} y1={PAD.top + CH * (1 - f)}
+            x2={PAD.left + CW} y2={PAD.top + CH * (1 - f)}
+            stroke="#f3f4f6" strokeWidth={1} />
+        ))}
+
+        {/* Previous month area + line */}
+        {hasPrev && (
+          <>
+            <path
+              d={`${path(prevCum)} L ${xOf(days.at(-1))} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
+              fill="#f59e0b" fillOpacity={0.05} />
+            <path d={path(prevCum)} fill="none" stroke="#f59e0b" strokeWidth={1.5}
+              strokeDasharray="5,3" strokeOpacity={0.7}
+              strokeLinejoin="round" strokeLinecap="round" />
+          </>
+        )}
+
+        {/* Current month area + line */}
+        {currCum.some(v => v > 0) && (
+          <>
+            <path
+              d={`${path(currCum)} L ${xOf(days.at(-1))} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
+              fill="#b45309" fillOpacity={0.07} />
+            <path d={path(currCum)} fill="none" stroke="#b45309" strokeWidth={2}
+              strokeLinejoin="round" strokeLinecap="round" />
+          </>
+        )}
+
+        {/* Dots and cumulative labels */}
+        {days.map((d, i) => {
+          const cx    = xOf(d)
+          const cy    = yOf(currCum[i])
+          const pyVal = prevCum[i]
+          const py    = pyVal > 0 ? yOf(pyVal) : null
+          const isLast  = i === days.length - 1
+          const showLbl = labelSet.has(d) && currCum[i] > 0
+
+          // Anchor: last day → right-align, otherwise center
+          const anchor = isLast ? 'end' : 'middle'
+
+          return (
+            <g key={d}>
+              {currDays[d] > 0 && (
+                <circle cx={cx} cy={cy} r={isLast ? 4 : 2.5} fill="#b45309" stroke="white" strokeWidth={1.5} />
+              )}
+              {hasPrev && prevDays[d] > 0 && py !== null && (
+                <circle cx={cx} cy={py} r={2} fill="#f59e0b" stroke="white" strokeWidth={1} fillOpacity={0.85} />
+              )}
+              {showLbl && (
+                <text x={cx} y={cy - 7} textAnchor={anchor} fill="#78350f" fontSize={8} fontWeight="700">
+                  {fmtV(currCum[i])}
+                </text>
+              )}
+              {/* Previous cumulative label at last point */}
+              {isLast && hasPrev && pyVal > 0 && py !== null && (
+                <text x={cx} y={py - 7} textAnchor="end" fill="#b45309" fontSize={7} fillOpacity={0.6}>
+                  {fmtV(pyVal)}
+                </text>
+              )}
+            </g>
+          )
+        })}
+
+        {/* X axis: show day numbers at intervals */}
+        {days.filter(d => d === 1 || d % 5 === 0 || d === nDays).map(d => (
+          <text key={d} x={xOf(d)} y={VH - 5} textAnchor="middle" fill="#9ca3af" fontSize={8}>
+            {d}
+          </text>
+        ))}
+      </svg>
+    </div>
+  )
+}
+
 // ─── Product detail view ──────────────────────────────────────────────────────
 
 function ProductoDetalle({ prod, months, maxDayInCurrent }) {
@@ -277,6 +414,22 @@ function ProductoDetalle({ prod, months, maxDayInCurrent }) {
           <BarChart monthly={prod.monthly} months={months} vista={vista} />
         </div>
       </div>
+
+      {/* ── Acumulado diario: mes actual vs mes anterior ── */}
+      {maxDayInCurrent > 0 && (
+        <div className="px-6 pt-3 pb-3 border-b bg-white">
+          <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1.5">
+            Acumulado diario — {vista === '$$$' ? 'monto' : 'unidades'}
+          </p>
+          <DailyLineChart
+            prod={prod}
+            currentYm={currentYm}
+            prevYm={prevYm}
+            maxDayInCurrent={maxDayInCurrent}
+            vista={vista}
+          />
+        </div>
+      )}
 
       {/* ── Tabla mensual ── */}
       <div>
