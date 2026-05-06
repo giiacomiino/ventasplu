@@ -724,15 +724,23 @@ export default function SubcatModal({ subcat, categoria, mes, onClose }) {
     const endDate   = endOfMonth(mes)
     const startDate = startOfMonth(subMonths(mes, 5))
 
-    const { data: rows, error: vErr } = await supabase
-      .from('ventas_plu')
-      .select('producto_id, unidades, monto, fecha')
-      .in('producto_id', prodIds)
-      .gte('fecha', format(startDate, 'yyyy-MM-dd'))
-      .lte('fecha', format(endDate, 'yyyy-MM-dd'))
-      .limit(10000)
-
-    if (vErr) { setError(vErr.message); setLoading(false); return }
+    // Paginate to work around Supabase's server-side 1000-row limit
+    const PAGE = 999
+    let rows = []
+    for (let from = 0; ; from += PAGE) {
+      const { data, error: vErr } = await supabase
+        .from('ventas_plu')
+        .select('producto_id, unidades, monto, fecha')
+        .in('producto_id', prodIds)
+        .gte('fecha', format(startDate, 'yyyy-MM-dd'))
+        .lte('fecha', format(endDate, 'yyyy-MM-dd'))
+        .order('fecha', { ascending: true })
+        .range(from, from + PAGE - 1)
+      if (vErr) { setError(vErr.message); setLoading(false); return }
+      if (!data?.length) break
+      rows = rows.concat(data)
+      if (data.length < PAGE) break
+    }
 
     const currentYm = format(mes, 'yyyy-MM')
     const mths = Array.from({ length: 6 }, (_, i) =>

@@ -13,14 +13,22 @@ export function useHistorial(numMeses = 6) {
       const hoy    = new Date()
       const inicio = startOfMonth(subMonths(hoy, numMeses - 1))
 
-      const { data: rows, error: err } = await supabase
-        .from('ventas_plu')
-        .select('fecha, unidades, monto, producto_id, productos(nombre, subcategoria, categoria)')
-        .gte('fecha', format(inicio, 'yyyy-MM-dd'))
-        .lte('fecha', format(hoy, 'yyyy-MM-dd'))
-        .limit(50000)
-
-      if (err) { setError(err.message); setLoading(false); return }
+      // Paginate to work around Supabase's server-side 1000-row limit
+      const PAGE = 999
+      let rows = []
+      for (let from = 0; ; from += PAGE) {
+        const { data, error: err } = await supabase
+          .from('ventas_plu')
+          .select('fecha, unidades, monto, producto_id, productos(nombre, subcategoria, categoria)')
+          .gte('fecha', format(inicio, 'yyyy-MM-dd'))
+          .lte('fecha', format(hoy, 'yyyy-MM-dd'))
+          .order('fecha', { ascending: true })
+          .range(from, from + PAGE - 1)
+        if (err) { setError(err.message); setLoading(false); return }
+        if (!data?.length) break
+        rows = rows.concat(data)
+        if (data.length < PAGE) break
+      }
 
       const months = Array.from({ length: numMeses }, (_, i) =>
         format(subMonths(hoy, numMeses - 1 - i), 'yyyy-MM')
