@@ -268,7 +268,7 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
       {/* Legend */}
       <div className="flex items-center gap-4 mb-1.5 justify-end">
         <div className="flex items-center gap-1.5 text-[10px] text-gray-700 font-semibold">
-          <div className="w-5 h-3 rounded-sm bg-[#b45309] opacity-80" />
+          <div className="w-5 h-[2px] rounded bg-[#b45309]" />
           <span className="capitalize">{currMonLabel}</span>
         </div>
         {hasPrev && prevMonLabel && (
@@ -294,37 +294,55 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
         <line x1={PAD.left} y1={PAD.top + CH} x2={PAD.left + CW} y2={PAD.top + CH}
           stroke="#e5e7eb" strokeWidth={1} />
 
-        {/* Current month bars */}
-        {days.map((d, i) => {
-          const val  = currDays[d] || 0
-          const bH   = val > 0 ? Math.max(2, (val / maxVal) * CH) : 0
-          const x    = xOf(d)
-          const isHov = hoverIdx === i
-          if (!bH) return null
-          return (
-            <rect key={d}
-              x={x} y={PAD.top + CH - bH} width={bW} height={bH} rx={1.5}
-              fill={isHov ? '#92400e' : '#b45309'} fillOpacity={isHov ? 1 : 0.82}
-            />
-          )
-        })}
-
-        {/* Prev month line overlay */}
+        {/* Prev month line */}
         {hasPrev && prevPath && (
-          <path d={prevPath} fill="none" stroke="#f59e0b" strokeWidth={1.5}
-            strokeDasharray="4,2.5" strokeOpacity={0.8}
-            strokeLinejoin="round" strokeLinecap="round" />
+          <>
+            <path d={`${prevPath} L ${xOf(days.at(-1)) + bW / 2} ${PAD.top + CH} L ${xOf(days[0]) + bW / 2} ${PAD.top + CH} Z`}
+              fill="#f59e0b" fillOpacity={0.05} />
+            <path d={prevPath} fill="none" stroke="#f59e0b" strokeWidth={1.5}
+              strokeDasharray="4,2.5" strokeOpacity={0.8}
+              strokeLinejoin="round" strokeLinecap="round" />
+          </>
         )}
 
-        {/* Prev month dots */}
-        {hasPrev && days.map((d, i) => {
-          const v = prevDays[d] || 0
-          if (!v) return null
-          const x = xOf(d) + bW / 2
-          const y = yOf(v)
+        {/* Current month line + area */}
+        {(() => {
+          let d = ''; let on = false
+          days.forEach((day, i) => {
+            const v = currDays[day] || 0
+            const x = xOf(day) + bW / 2
+            const y = yOf(v)
+            if (v > 0) { d += `${on ? 'L' : 'M'} ${x} ${y} `; on = true }
+            else on = false
+          })
+          if (!d) return null
           return (
-            <circle key={d} cx={x} cy={y} r={hoverIdx === i ? 3 : 1.8}
-              fill="#f59e0b" stroke="white" strokeWidth={1} fillOpacity={0.85} />
+            <>
+              <path d={`${d} L ${xOf(days.at(-1)) + bW / 2} ${PAD.top + CH} L ${xOf(days[0]) + bW / 2} ${PAD.top + CH} Z`}
+                fill="#b45309" fillOpacity={0.08} />
+              <path d={d} fill="none" stroke="#b45309" strokeWidth={2}
+                strokeLinejoin="round" strokeLinecap="round" />
+            </>
+          )
+        })()}
+
+        {/* Dots */}
+        {days.map((d, i) => {
+          const cv = currDays[d] || 0
+          const pv = prevDays[d] || 0
+          const cx = xOf(d) + bW / 2
+          const isHov = hoverIdx === i
+          return (
+            <g key={d}>
+              {cv > 0 && (
+                <circle cx={cx} cy={yOf(cv)} r={isHov ? 4 : 2.5}
+                  fill="#b45309" stroke="white" strokeWidth={isHov ? 2 : 1.5} />
+              )}
+              {hasPrev && pv > 0 && (
+                <circle cx={cx} cy={yOf(pv)} r={isHov ? 3 : 2}
+                  fill="#f59e0b" stroke="white" strokeWidth={1} fillOpacity={0.85} />
+              )}
+            </g>
           )
         })}
 
