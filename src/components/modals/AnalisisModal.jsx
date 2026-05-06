@@ -42,6 +42,29 @@ function catMonthlyFrom(tree, categoria, months) {
   return result
 }
 
+// Merge subcategory daily records up to category level
+function catDailyFrom(tree, categoria) {
+  const result = {}
+  for (const node of Object.values(tree[categoria] || {})) {
+    for (const [d, v] of Object.entries(node.daily || {})) {
+      if (!result[d]) result[d] = { monto: 0, unidades: 0 }
+      result[d].monto    += v.monto    || 0
+      result[d].unidades += v.unidades || 0
+    }
+  }
+  return result
+}
+
+// Sum daily values from a daily map up to maxDay days in prevYm
+function cappedPrev(daily, prevYm, maxDay, k) {
+  if (!daily || !prevYm || !maxDay) return 0
+  let total = 0
+  for (const [d, v] of Object.entries(daily)) {
+    if (d.startsWith(prevYm) && parseInt(d.slice(8, 10)) <= maxDay) total += v[k] || 0
+  }
+  return total
+}
+
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, mom, sub }) {
@@ -223,7 +246,7 @@ function ProgressRow({ label, value, total, color, onClick }) {
 
 // ─── NIVEL 0 — Overview general ───────────────────────────────────────────────
 
-function VistaOverview({ tree, months, vista, onDrill, missingData = [] }) {
+function VistaOverview({ tree, months, vista, onDrill, missingData = [], maxDay = 0 }) {
   const bebMonthly = catMonthlyFrom(tree, 'Bebidas', months)
   const aliMonthly = catMonthlyFrom(tree, 'Alimentos', months)
 
@@ -239,9 +262,14 @@ function VistaOverview({ tree, months, vista, onDrill, missingData = [] }) {
   const prevYm  = months.at(-2)
   const k       = vista === '$$$' ? 'monto' : 'unidades'
   const totLast = totalMonthly[lastYm]?.[k] || 0
-  const totPrev = totalMonthly[prevYm]?.[k] || 0
   const bebLast = bebMonthly[lastYm]?.[k] || 0
   const aliLast = aliMonthly[lastYm]?.[k] || 0
+
+  const bebDaily       = catDailyFrom(tree, 'Bebidas')
+  const aliDaily       = catDailyFrom(tree, 'Alimentos')
+  const bebPrevCapped  = cappedPrev(bebDaily, prevYm, maxDay, k)
+  const aliPrevCapped  = cappedPrev(aliDaily, prevYm, maxDay, k)
+  const totPrevCapped  = bebPrevCapped + aliPrevCapped
 
   const totalPeriod = months.reduce((s, ym) => s + (totalMonthly[ym]?.[k] || 0), 0)
 
@@ -258,12 +286,12 @@ function VistaOverview({ tree, months, vista, onDrill, missingData = [] }) {
     <div className="overflow-auto flex-1 p-6 bg-gray-50/50 space-y-5">
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
-        <KpiCard label="Total mes actual" value={fmt(totLast, vista)} mom={momPct(totLast, totPrev)} />
+        <KpiCard label="Total mes actual" value={fmt(totLast, vista)} mom={momPct(totLast, totPrevCapped)} />
         <KpiCard label="Bebidas MTD" value={fmt(bebLast, vista)}
-          mom={momPct(bebLast, bebMonthly[prevYm]?.[k] || 0)}
+          mom={momPct(bebLast, bebPrevCapped)}
           sub={totLast > 0 ? `${Math.round(bebLast/totLast*100)}% del total` : null} />
         <KpiCard label="Alimentos MTD" value={fmt(aliLast, vista)}
-          mom={momPct(aliLast, aliMonthly[prevYm]?.[k] || 0)}
+          mom={momPct(aliLast, aliPrevCapped)}
           sub={totLast > 0 ? `${Math.round(aliLast/totLast*100)}% del total` : null} />
         <KpiCard label="Productos activos" value={numProds}
           sub={`Total período: ${fmt(totalPeriod, vista)}`} />
@@ -373,7 +401,7 @@ function VistaOverview({ tree, months, vista, onDrill, missingData = [] }) {
 
 // ─── NIVEL 1 — Categoría ──────────────────────────────────────────────────────
 
-function VistaCategoria({ categoria, tree, months, vista, onBack, onDrill }) {
+function VistaCategoria({ categoria, tree, months, vista, onBack, onDrill, maxDay = 0 }) {
   const col   = CAT_COLOR[categoria]
   const catM  = catMonthlyFrom(tree, categoria, months)
   const subcats = Object.entries(tree[categoria] || {}).sort((a, b) => {
@@ -382,12 +410,12 @@ function VistaCategoria({ categoria, tree, months, vista, onBack, onDrill }) {
     return bt - at
   })
 
-  const lastYm  = months.at(-1)
-  const prevYm  = months.at(-2)
-  const k       = vista === '$$$' ? 'monto' : 'unidades'
-  const lastVal = catM[lastYm]?.[k] || 0
-  const prevVal = catM[prevYm]?.[k] || 0
-  const period  = months.reduce((s, ym) => s + (catM[ym]?.[k] || 0), 0)
+  const lastYm       = months.at(-1)
+  const prevYm       = months.at(-2)
+  const k            = vista === '$$$' ? 'monto' : 'unidades'
+  const lastVal      = catM[lastYm]?.[k] || 0
+  const prevValCapped = cappedPrev(catDailyFrom(tree, categoria), prevYm, maxDay, k)
+  const period       = months.reduce((s, ym) => s + (catM[ym]?.[k] || 0), 0)
 
   const top5 = subcats.slice(0, 6).map(([subcat, node], i) => ({
     label: subcat, monthly: node.monthly, color: COLORS[i],
@@ -401,7 +429,7 @@ function VistaCategoria({ categoria, tree, months, vista, onBack, onDrill }) {
         </button>
 
         <div className="grid grid-cols-4 gap-4">
-          <KpiCard label="Mes actual" value={fmt(lastVal, vista)} mom={momPct(lastVal, prevVal)} />
+          <KpiCard label="Mes actual" value={fmt(lastVal, vista)} mom={momPct(lastVal, prevValCapped)} />
           <KpiCard label="Total período" value={fmt(period, vista)} />
           <KpiCard label="Subcategorías" value={subcats.length} />
           <KpiCard label="Top subcategoría" value={subcats[0]?.[0]}
@@ -441,7 +469,7 @@ function VistaCategoria({ categoria, tree, months, vista, onBack, onDrill }) {
           <tbody>
             {subcats.map(([subcat, node], si) => {
               const total = months.reduce((s, ym) => s + getVal(node.monthly, ym, vista), 0)
-              const mom   = momPct(getVal(node.monthly, lastYm, vista), getVal(node.monthly, prevYm, vista))
+              const mom   = momPct(getVal(node.monthly, lastYm, vista), cappedPrev(node.daily, prevYm, maxDay, k))
               return (
                 <tr key={subcat} onClick={() => onDrill(subcat)}
                   className="cursor-pointer hover:bg-gold-50 border-b border-gray-100 transition-colors select-none group">
@@ -475,18 +503,19 @@ function VistaCategoria({ categoria, tree, months, vista, onBack, onDrill }) {
 
 // ─── NIVEL 2 — Subcategoría ───────────────────────────────────────────────────
 
-function VistaSubcat({ categoria, subcat, node, months, vista, onBack, onDrill }) {
+function VistaSubcat({ categoria, subcat, node, months, vista, onBack, onDrill, maxDay = 0 }) {
   const prods = Object.values(node.productos).sort((a, b) => {
     const at = months.reduce((s, ym) => s + getVal(a.monthly, ym, '$$$'), 0)
     const bt = months.reduce((s, ym) => s + getVal(b.monthly, ym, '$$$'), 0)
     return bt - at
   })
 
-  const lastYm  = months.at(-1)
-  const prevYm  = months.at(-2)
-  const lastVal = getVal(node.monthly, lastYm, vista)
-  const prevVal = getVal(node.monthly, prevYm, vista)
-  const period  = months.reduce((s, ym) => s + getVal(node.monthly, ym, vista), 0)
+  const lastYm       = months.at(-1)
+  const prevYm       = months.at(-2)
+  const k            = vista === '$$$' ? 'monto' : 'unidades'
+  const lastVal      = getVal(node.monthly, lastYm, vista)
+  const prevValCapped = cappedPrev(node.daily, prevYm, maxDay, k)
+  const period       = months.reduce((s, ym) => s + getVal(node.monthly, ym, vista), 0)
 
   const top5 = prods.slice(0, 5).map((p, i) => ({
     label: p.nombre, monthly: p.monthly, color: COLORS[i],
@@ -501,7 +530,7 @@ function VistaSubcat({ categoria, subcat, node, months, vista, onBack, onDrill }
         </button>
 
         <div className="grid grid-cols-4 gap-4">
-          <KpiCard label="Mes actual" value={fmt(lastVal, vista)} mom={momPct(lastVal, prevVal)} />
+          <KpiCard label="Mes actual" value={fmt(lastVal, vista)} mom={momPct(lastVal, prevValCapped)} />
           <KpiCard label="Total período" value={fmt(period, vista)} />
           <KpiCard label="Productos" value={prods.length} />
           <KpiCard label="Top producto" value={prods[0]?.nombre}
@@ -541,7 +570,7 @@ function VistaSubcat({ categoria, subcat, node, months, vista, onBack, onDrill }
           <tbody>
             {prods.map((prod, si) => {
               const total = months.reduce((s, ym) => s + getVal(prod.monthly, ym, vista), 0)
-              const mom   = momPct(getVal(prod.monthly, lastYm, vista), getVal(prod.monthly, prevYm, vista))
+              const mom   = momPct(getVal(prod.monthly, lastYm, vista), cappedPrev(prod.daily, prevYm, maxDay, k))
               return (
                 <tr key={prod.id} onClick={() => onDrill(prod.id)}
                   className="cursor-pointer hover:bg-blue-50/30 border-b border-gray-50 transition-colors select-none group">
@@ -574,14 +603,15 @@ function VistaSubcat({ categoria, subcat, node, months, vista, onBack, onDrill }
 
 // ─── NIVEL 3 — Producto ───────────────────────────────────────────────────────
 
-function VistaProducto({ prod, subcat, months, vista, onBack }) {
+function VistaProducto({ prod, subcat, months, vista, onBack, maxDay = 0 }) {
+  const k       = vista === '$$$' ? 'monto' : 'unidades'
   const values  = months.map(ym => getVal(prod.monthly, ym, vista))
   const total   = values.reduce((s, v) => s + v, 0)
   const avg     = months.length ? Math.round(total / months.length) : 0
-  const max     = Math.max(...values, 1)
   const bestIdx = values.indexOf(Math.max(...values))
-  const lastVal = values.at(-1) || 0
-  const prevVal = values.at(-2) || 0
+  const lastVal      = values.at(-1) || 0
+  const prevYm       = months.at(-2)
+  const prevValCapped = cappedPrev(prod.daily, prevYm, maxDay, k)
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -592,7 +622,7 @@ function VistaProducto({ prod, subcat, months, vista, onBack }) {
         </button>
 
         <div className="grid grid-cols-4 gap-4">
-          <KpiCard label="Mes actual (MTD)" value={fmt(lastVal, vista)} mom={momPct(lastVal, prevVal)} />
+          <KpiCard label="Mes actual (MTD)" value={fmt(lastVal, vista)} mom={momPct(lastVal, prevValCapped)} />
           <KpiCard label="Promedio / mes"   value={fmt(avg, vista)} />
           <KpiCard label="Mejor mes"        value={fmt(values[bestIdx], vista)}
             sub={months[bestIdx] ? monthLabel(months[bestIdx]) : null} />
@@ -622,12 +652,14 @@ function VistaProducto({ prod, subcat, months, vista, onBack }) {
           <tbody>
             {[...months].reverse().map((ym, ri) => {
               const i      = months.length - 1 - ri
+              const isLast = i === months.length - 1
               const val    = values[i]
-              const prev   = i > 0 ? values[i - 1] : null
+              const prev   = i > 0
+                ? (isLast ? cappedPrev(prod.daily, months[i - 1], maxDay, k) : values[i - 1])
+                : null
               const mom    = momPct(val, prev)
               const vsProm = avg > 0 && val > 0 ? +((val - avg) / avg * 100).toFixed(1) : null
               const pct    = total > 0 ? Math.round(val / total * 100) : 0
-              const isLast = i === months.length - 1
 
               return (
                 <tr key={ym} className={`border-b border-gray-50 ${isLast ? 'bg-amber-50/30' : ''}`}>
@@ -676,9 +708,10 @@ export default function AnalisisModal({ onClose }) {
 
   const { data, loading, error } = useHistorial(numMeses)
 
-  const months      = data?.months      || []
-  const tree        = data?.tree        || {}
-  const missingData = data?.missingData || []
+  const months      = data?.months               || []
+  const tree        = data?.tree                 || {}
+  const missingData = data?.missingData          || []
+  const maxDay      = data?.maxDayInCurrentMonth || 0
   const subcatNode = drill?.subcat    ? tree[drill.categoria]?.[drill.subcat]                         : null
   const prodNode   = drill?.productId ? subcatNode?.productos?.[drill.productId]                      : null
 
@@ -731,18 +764,18 @@ export default function AnalisisModal({ onClose }) {
     content = <p className="text-center py-20 text-red-400">{error}</p>
   } else if (drill?.level === 'product' && prodNode) {
     content = <VistaProducto prod={prodNode} subcat={drill.subcat} months={months} vista={vista}
-      onBack={() => back('subcat')} />
+      maxDay={maxDay} onBack={() => back('subcat')} />
   } else if (drill?.level === 'subcat' && subcatNode) {
     content = <VistaSubcat categoria={drill.categoria} subcat={drill.subcat} node={subcatNode}
-      months={months} vista={vista} onBack={() => back('category')}
+      months={months} vista={vista} maxDay={maxDay} onBack={() => back('category')}
       onDrill={id => go({ level: 'product', productId: id })} />
   } else if (drill?.level === 'category') {
     content = <VistaCategoria categoria={drill.categoria} tree={tree} months={months} vista={vista}
-      onBack={() => setDrill(null)}
+      maxDay={maxDay} onBack={() => setDrill(null)}
       onDrill={subcat => go({ level: 'subcat', subcat })} />
   } else {
     content = <VistaOverview tree={tree} months={months} vista={vista} missingData={missingData}
-      onDrill={cat => setDrill({ level: 'category', categoria: cat })} />
+      maxDay={maxDay} onDrill={cat => setDrill({ level: 'category', categoria: cat })} />
   }
 
   return (

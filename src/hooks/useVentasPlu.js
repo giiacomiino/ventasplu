@@ -33,11 +33,19 @@ export function useVentasPlu(selectedMonth) {
     if (!data || data.length === 0) return { monto: 0, unidades: 0, mom: null }
     const monto    = data.reduce((s, r) => s + Number(r.monto    || 0), 0)
     const unidades = data.reduce((s, r) => s + Number(r.unidades || 0), 0)
-    const conMom   = data.filter(r => r.mom_pct != null)
-    const mom      = conMom.length
-      ? conMom.reduce((s, r) => s + Number(r.mom_pct), 0) / conMom.length
-      : null
-    return { monto, unidades, mom: mom != null ? Math.round(mom * 10) / 10 : null }
+    // Derive each subcategory's previous-month monto from its mom_pct, then
+    // compute the true category-level MoM% from the aggregated totals.
+    const conMom = data.filter(r => r.mom_pct != null)
+    let mom = null
+    if (conMom.length > 0) {
+      const totalPrev = conMom.reduce((s, r) => {
+        const prev = Number(r.monto) / (1 + Number(r.mom_pct) / 100)
+        return s + prev
+      }, 0)
+      const totalCurr = conMom.reduce((s, r) => s + Number(r.monto), 0)
+      if (totalPrev > 0) mom = Math.round((totalCurr - totalPrev) / totalPrev * 1000) / 10
+    }
+    return { monto, unidades, mom }
   }
 
   return {

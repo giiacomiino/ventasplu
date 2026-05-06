@@ -45,7 +45,7 @@ export function useHistorial(numMeses = 6) {
 
         if (!tree[categoria]) tree[categoria] = {}
         if (!tree[categoria][subcategoria]) {
-          tree[categoria][subcategoria] = { monthly: {}, productos: {} }
+          tree[categoria][subcategoria] = { monthly: {}, daily: {}, productos: {} }
         }
         const subNode = tree[categoria][subcategoria]
 
@@ -53,13 +53,21 @@ export function useHistorial(numMeses = 6) {
         subNode.monthly[ym].monto    += Number(r.monto    || 0)
         subNode.monthly[ym].unidades += Number(r.unidades || 0)
 
+        if (!subNode.daily[r.fecha]) subNode.daily[r.fecha] = { monto: 0, unidades: 0 }
+        subNode.daily[r.fecha].monto    += Number(r.monto    || 0)
+        subNode.daily[r.fecha].unidades += Number(r.unidades || 0)
+
         if (!subNode.productos[r.producto_id]) {
-          subNode.productos[r.producto_id] = { id: r.producto_id, nombre, monthly: {} }
+          subNode.productos[r.producto_id] = { id: r.producto_id, nombre, monthly: {}, daily: {} }
         }
         const pNode = subNode.productos[r.producto_id]
         if (!pNode.monthly[ym]) pNode.monthly[ym] = { monto: 0, unidades: 0 }
         pNode.monthly[ym].monto    += Number(r.monto    || 0)
         pNode.monthly[ym].unidades += Number(r.unidades || 0)
+
+        if (!pNode.daily[r.fecha]) pNode.daily[r.fecha] = { monto: 0, unidades: 0 }
+        pNode.daily[r.fecha].monto    += Number(r.monto    || 0)
+        pNode.daily[r.fecha].unidades += Number(r.unidades || 0)
 
         // Track per-product dates for current month only
         if (ym === currentYm) {
@@ -83,7 +91,11 @@ export function useHistorial(numMeses = 6) {
       }
       missingData.sort((a, b) => b.missingDates.length - a.missingDates.length)
 
-      setData({ months, tree, missingData })
+      const maxDayInCurrentMonth = activeDates.size > 0
+        ? Math.max(...[...activeDates].map(d => parseInt(d.slice(8, 10))))
+        : 0
+
+      setData({ months, tree, missingData, maxDayInCurrentMonth })
       setLoading(false)
     }
 
