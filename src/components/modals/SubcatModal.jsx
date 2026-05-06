@@ -141,33 +141,49 @@ function BarChart({ monthly, months, vista }) {
   const k    = vista === '$$$' ? 'monto' : 'unidades'
   const vals = months.map(ym => monthly[ym]?.[k] || 0)
   const max  = Math.max(...vals, 1)
-  const bW = 32, gap = 6, h = 90
+
+  // Wide bars so the viewBox aspect ratio ~4.5:1 → chart renders ~140px tall at modal width
+  const bW = 76, gap = 14, barH = 72
+  const PAD = { top: 28, bottom: 24 }
   const totalW = months.length * (bW + gap) - gap
+  const svgH   = PAD.top + barH + PAD.bottom
 
   const lbl = v => {
     if (!v) return ''
-    if (vista === '$$$') return v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
-    return v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
+    if (vista === '$$$') return v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`
+    return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
   }
 
   return (
-    <svg width="100%" viewBox={`-2 0 ${totalW + 4} ${h + 30}`} preserveAspectRatio="none" className="w-full">
+    <svg width="100%" viewBox={`0 0 ${totalW} ${svgH}`} className="w-full">
+      {/* Grid lines */}
+      {[0.33, 0.66, 1].map(pct => {
+        const gy = PAD.top + barH - pct * barH
+        return <line key={pct} x1={0} y1={gy} x2={totalW} y2={gy} stroke="#f3f4f6" strokeWidth={1.5} />
+      })}
+
       {months.map((ym, i) => {
-        const val = vals[i]
-        const bH  = Math.max(Math.round((val / max) * h), val > 0 ? 2 : 0)
-        const x   = i * (bW + gap)
+        const val    = vals[i]
+        const bH     = Math.max(Math.round((val / max) * barH), val > 0 ? 2 : 0)
+        const x      = i * (bW + gap)
+        const barTop = PAD.top + barH - bH
         const isLast = i === months.length - 1
-        const ml = format(new Date(+ym.split('-')[0], +ym.split('-')[1] - 1, 1), 'MMM', { locale: es })
+        const ml     = format(new Date(+ym.split('-')[0], +ym.split('-')[1] - 1, 1), 'MMM', { locale: es })
         return (
           <g key={ym}>
-            <rect x={x} y={h - bH} width={bW} height={bH} rx={3}
-              fill={isLast ? '#d97706' : '#fcd34d'} />
+            {bH > 0 && (
+              <rect x={x} y={barTop} width={bW} height={bH} rx={4}
+                fill={isLast ? '#b45309' : '#f59e0b'} />
+            )}
             {val > 0 && (
-              <text x={x + bW / 2} y={h - bH - 5} textAnchor="middle" fill="#78350f" fontSize={9} fontWeight="600">
+              <text x={x + bW / 2} y={barTop - 6} textAnchor="middle" fill="#78350f" fontSize={11} fontWeight="700">
                 {lbl(val)}
               </text>
             )}
-            <text x={x + bW / 2} y={h + 16} textAnchor="middle" fill="#9ca3af" fontSize={10}>{ml}</text>
+            <text x={x + bW / 2} y={svgH - 5} textAnchor="middle"
+              fill={val > 0 ? '#6b7280' : '#d1d5db'} fontSize={12}>
+              {ml}
+            </text>
           </g>
         )
       })}
@@ -177,19 +193,19 @@ function BarChart({ monthly, months, vista }) {
 
 // ─── Product detail view ──────────────────────────────────────────────────────
 
-function ProductoDetalle({ prod, months, maxDayInCurrent, onBack }) {
+function ProductoDetalle({ prod, months, maxDayInCurrent }) {
   const [vista, setVista] = useState('###')
-  const k       = vista === '$$$' ? 'monto' : 'unidades'
+  const k         = vista === '$$$' ? 'monto' : 'unidades'
   const currentYm = months.at(-1)
   const prevYm    = months.at(-2)
 
-  // MTD-capped MoM%
+  // MTD-capped MoM% for current month
   const currVal = prod.monthly[currentYm]?.[k] || 0
   let prevVal = 0
   if (prevYm && maxDayInCurrent > 0) {
-    for (const [date, vals] of Object.entries(prod.days)) {
+    for (const [date, dv] of Object.entries(prod.days)) {
       if (date.startsWith(prevYm) && parseInt(date.slice(8, 10)) <= maxDayInCurrent) {
-        prevVal += vals[k] || 0
+        prevVal += dv[k] || 0
       }
     }
   }
@@ -199,65 +215,81 @@ function ProductoDetalle({ prod, months, maxDayInCurrent, onBack }) {
   const total   = allVals.reduce((s, v) => s + v, 0)
   const avg     = months.length ? Math.round(total / months.length) : 0
   const bestIdx = allVals.indexOf(Math.max(...allVals))
-
-  const fmt = v => v ? (vista === '$$$' ? formatMoney(v) : formatUnits(v)) : '—'
+  const fmt     = v => v ? (vista === '$$$' ? formatMoney(v) : formatUnits(v)) : '—'
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="px-6 pt-5 pb-4 border-b bg-gray-50/60 flex-shrink-0">
-        <div className="flex justify-between items-start mb-4">
-          <button onClick={onBack}
-            className="flex items-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 font-semibold transition-colors">
-            <ArrowLeft size={12} /> Volver a productos
-          </button>
-          <div className="flex rounded-lg border overflow-hidden">
-            {['$$$', '###'].map(v => (
+    <div className="flex-1 overflow-auto min-h-0">
+
+      {/* ── Toggle + KPIs ── */}
+      <div className="px-6 pt-4 pb-4 border-b">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">Indicadores del período</p>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+            {[{ v: '###', label: 'Unidades' }, { v: '$$$', label: 'Monto' }].map(({ v, label }) => (
               <button key={v} onClick={() => setVista(v)}
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors
-                  ${vista === v ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-                {v}
+                className={`px-3 py-1.5 font-semibold transition-colors
+                  ${vista === v ? 'bg-amber-700 text-white' : 'text-gray-400 hover:bg-gray-50'}`}>
+                {label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-4 gap-2.5">
           {[
-            { label: 'Mes actual (MTD)', value: fmt(currVal), extra: mom != null && (
-              <p className={`text-xs font-semibold mt-0.5 flex items-center gap-0.5 ${mom >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {mom >= 0 ? <TrendingUp size={10}/> : <TrendingDown size={10}/>}
-                {mom >= 0 ? '+' : ''}{mom.toFixed(1)}%
-              </p>
-            )},
-            { label: 'Promedio/mes', value: fmt(avg) },
-            { label: 'Mejor mes', value: fmt(allVals[bestIdx]),
-              sub: months[bestIdx] ? format(new Date(+months[bestIdx].split('-')[0], +months[bestIdx].split('-')[1]-1,1),'MMM-yy',{locale:es}) : null },
-            { label: 'Total período', value: fmt(total) },
-          ].map(({ label, value, extra, sub }) => (
-            <div key={label} className="bg-white rounded-lg border border-gray-100 px-4 py-3">
-              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">{label}</p>
-              <p className="text-base font-bold text-gray-800 mt-0.5 tabular-nums">{value}</p>
-              {extra}
-              {sub && <p className="text-xs text-gray-400 capitalize">{sub}</p>}
+            {
+              label: 'MTD actual',
+              value: fmt(currVal),
+              sub: mom != null
+                ? <span className={`flex items-center gap-0.5 text-[10px] font-bold ${mom >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {mom >= 0 ? <TrendingUp size={9}/> : <TrendingDown size={9}/>}
+                    {mom >= 0 ? '+' : ''}{mom.toFixed(1)}% vs mes ant.
+                  </span>
+                : null,
+            },
+            { label: 'Promedio / mes', value: fmt(avg) },
+            {
+              label: 'Mejor mes',
+              value: fmt(allVals[bestIdx]),
+              sub: months[bestIdx]
+                ? <span className="text-[10px] text-amber-600 capitalize">
+                    {format(new Date(+months[bestIdx].split('-')[0], +months[bestIdx].split('-')[1]-1, 1), 'MMM yyyy', { locale: es })}
+                  </span>
+                : null,
+            },
+            { label: 'Total 6 meses', value: fmt(total) },
+          ].map(({ label, value, sub }) => (
+            <div key={label} className="bg-amber-50/50 border border-amber-100 rounded-xl px-3 py-2.5">
+              <p className="text-[9px] text-amber-800/50 uppercase tracking-wide font-bold leading-tight">{label}</p>
+              <p className="text-sm font-bold text-gray-800 mt-1 tabular-nums leading-none">{value}</p>
+              {sub && <div className="mt-1">{sub}</div>}
             </div>
           ))}
         </div>
+      </div>
 
-        <div className="bg-white rounded-lg border border-gray-100 p-4">
+      {/* ── Gráfica de barras ── */}
+      <div className="px-6 pt-3 pb-3 border-b bg-gray-50/40">
+        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1.5">
+          Evolución — {vista === '$$$' ? 'monto' : 'unidades'}
+        </p>
+        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2">
           <BarChart monthly={prod.monthly} months={months} vista={vista} />
         </div>
       </div>
 
-      {/* Tabla mensual */}
-      <div className="overflow-auto flex-1">
+      {/* ── Tabla mensual ── */}
+      <div>
+        <div className="px-6 pt-3 pb-1">
+          <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">Detalle mensual</p>
+        </div>
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-white border-b shadow-sm">
+          <thead className="bg-white border-b">
             <tr>
-              <th className="text-left px-6 py-2.5 font-semibold text-gray-400 text-xs">Mes</th>
-              <th className="text-right px-5 py-2.5 font-semibold text-gray-400 text-xs">Unidades</th>
-              <th className="text-right px-5 py-2.5 font-semibold text-gray-400 text-xs">Monto</th>
-              <th className="text-right px-6 py-2.5 font-semibold text-gray-400 text-xs">MoM% MTD</th>
+              <th className="text-left px-6 py-2 font-semibold text-gray-400 text-xs">Mes</th>
+              <th className="text-right px-5 py-2 font-semibold text-gray-400 text-xs">Unidades</th>
+              <th className="text-right px-5 py-2 font-semibold text-gray-400 text-xs">Monto</th>
+              <th className="text-right px-6 py-2 font-semibold text-gray-400 text-xs">MoM%</th>
             </tr>
           </thead>
           <tbody>
@@ -265,34 +297,33 @@ function ProductoDetalle({ prod, months, maxDayInCurrent, onBack }) {
               const i      = months.length - 1 - ri
               const row    = prod.monthly[ym] || { unidades: 0, monto: 0 }
               const isLast = i === months.length - 1
-              // MTD-capped MoM% for each month row
               let rowMom = null
               if (i > 0) {
                 const prevM = months[i - 1]
-                const cap   = isLast ? maxDayInCurrent : 31  // full month for historical
-                let prevU = 0
-                for (const [date, vals] of Object.entries(prod.days)) {
+                const cap   = isLast ? maxDayInCurrent : 31
+                let prevK = 0
+                for (const [date, dv] of Object.entries(prod.days)) {
                   if (date.startsWith(prevM) && parseInt(date.slice(8, 10)) <= cap) {
-                    prevU += vals.unidades
+                    prevK += dv[k] || 0
                   }
                 }
-                rowMom = momPct(row.unidades, prevU)
+                rowMom = momPct(row[k], prevK)
               }
               return (
-                <tr key={ym} className={`border-b border-gray-50 ${isLast ? 'bg-amber-50/30' : ''}`}>
-                  <td className="px-6 py-3 text-gray-600 capitalize text-sm">
-                    {format(new Date(+ym.split('-')[0], +ym.split('-')[1]-1,1), 'MMMM yyyy', { locale: es })}
+                <tr key={ym} className={`border-b border-gray-50 ${isLast ? 'bg-amber-50/40' : 'hover:bg-gray-50/60'}`}>
+                  <td className="px-6 py-2.5 text-gray-600 capitalize text-sm font-medium">
+                    {format(new Date(+ym.split('-')[0], +ym.split('-')[1]-1, 1), 'MMMM yyyy', { locale: es })}
                     {isLast && (
-                      <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">MTD</span>
+                      <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">MTD</span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-right font-bold text-gray-800 tabular-nums">
-                    {row.unidades ? formatUnits(row.unidades) : <span className="text-gray-300">—</span>}
+                  <td className="px-5 py-2.5 text-right font-bold text-gray-800 tabular-nums">
+                    {row.unidades ? formatUnits(row.unidades) : <span className="text-gray-200">—</span>}
                   </td>
-                  <td className="px-5 py-3 text-right text-gray-500 tabular-nums">
+                  <td className="px-5 py-2.5 text-right text-gray-500 tabular-nums">
                     {row.monto ? formatMoney(row.monto) : <span className="text-gray-200">—</span>}
                   </td>
-                  <td className="px-6 py-3 text-right"><MomBadge pct={rowMom} /></td>
+                  <td className="px-6 py-2.5 text-right"><MomBadge pct={rowMom} /></td>
                 </tr>
               )
             })}
@@ -330,7 +361,7 @@ function SubcatOverview({ prods, months, maxDayInCurrent, onSelect, subcat, mesL
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div className="flex flex-col flex-1 overflow-hidden min-h-0">
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 p-6 border-b flex-shrink-0">
         <div className="border border-gray-100 rounded-xl p-5 text-center">
@@ -516,7 +547,6 @@ export default function SubcatModal({ subcat, categoria, mes, onClose }) {
           prod={selected}
           months={months}
           maxDayInCurrent={maxDayInCurrent}
-          onBack={() => setSelected(null)}
         />
       ) : (
         <SubcatOverview
