@@ -730,6 +730,7 @@ export default function SubcatModal({ subcat, categoria, mes, onClose }) {
       .in('producto_id', prodIds)
       .gte('fecha', format(startDate, 'yyyy-MM-dd'))
       .lte('fecha', format(endDate, 'yyyy-MM-dd'))
+      .limit(10000)
 
     if (vErr) { setError(vErr.message); setLoading(false); return }
 

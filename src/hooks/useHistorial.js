@@ -18,6 +18,7 @@ export function useHistorial(numMeses = 6) {
         .select('fecha, unidades, monto, producto_id, productos(nombre, subcategoria, categoria)')
         .gte('fecha', format(inicio, 'yyyy-MM-dd'))
         .lte('fecha', format(hoy, 'yyyy-MM-dd'))
+        .limit(50000)
 
       if (err) { setError(err.message); setLoading(false); return }
 
