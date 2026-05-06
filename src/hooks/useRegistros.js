@@ -6,7 +6,7 @@ export function useRegistros() {
   const getRegistrosPorFecha = async (fecha) => {
     const { data } = await supabase
       .from('ventas_plu')
-      .select(`id, unidades, monto, costo_unitario, fecha,
+      .select(`id, producto_id, unidades, monto, costo_unitario, fecha,
                productos (nombre, subcategoria, categoria)`)
       .eq('fecha', format(fecha, 'yyyy-MM-dd'))
       .order('created_at')
