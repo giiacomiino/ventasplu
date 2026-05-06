@@ -13,9 +13,10 @@ import { toLabel } from '../utils/dateHelpers'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-const COLORS = [
-  '#dc2626','#ea580c','#d97706','#65a30d','#16a34a',
-  '#0d9488','#0284c7','#7c3aed','#c026d3','#db2777','#64748b',
+// Monochromatic amber/gold palette — darkest to lightest
+const PALETTE = [
+  '#78350f','#92400e','#b45309','#d97706','#f59e0b',
+  '#fbbf24','#fcd34d','#f0d070','#e8c860','#ddc050','#d4b896',
 ]
 
 const MODAL = {
@@ -61,7 +62,7 @@ function KpiCard({ label, value, mom, sub, accent }) {
 
 // ─── Donut chart ──────────────────────────────────────────────────────────────
 
-function DonutChart({ data, colorStart = 0, onSliceClick }) {
+function DonutChart({ data, onSliceClick }) {
   const [hover, setHover] = useState(null)
   const total = data.reduce((s, r) => s + Number(r.unidades || 0), 0)
   if (!total) return <p className="text-xs text-gray-300 text-center py-4">Sin datos</p>
@@ -82,7 +83,7 @@ function DonutChart({ data, colorStart = 0, onSliceClick }) {
       `A ${ri} ${ri} 0 ${large} 0 ${cx + ri * Math.cos(s)} ${cy + ri * Math.sin(s)}`,
       'Z',
     ].join(' ')
-    return { ...row, d, pct, color: COLORS[(i + colorStart) % COLORS.length], idx: i }
+    return { ...row, d, pct, color: PALETTE[i % PALETTE.length], idx: i }
   })
 
   return (
@@ -130,7 +131,7 @@ function DonutChart({ data, colorStart = 0, onSliceClick }) {
 
 // ─── Subcategory table ────────────────────────────────────────────────────────
 
-function SubcatTable({ titulo, data, colorStart = 0, onRowClick }) {
+function SubcatTable({ titulo, data, onRowClick }) {
   const total = data.reduce((s, r) => s + Number(r.unidades || 0), 0)
   const totalMonto = data.reduce((s, r) => s + Number(r.monto || 0), 0)
 
@@ -159,7 +160,7 @@ function SubcatTable({ titulo, data, colorStart = 0, onRowClick }) {
             </tr>
           ) : data.map((row, i) => {
             const pct = total > 0 ? (Number(row.unidades) / total * 100).toFixed(1) : '0.0'
-            const color = COLORS[(i + colorStart) % COLORS.length]
+            const color = PALETTE[i % PALETTE.length]
             return (
               <tr key={row.subcategoria}
                 onClick={() => onRowClick(row.subcategoria)}
@@ -289,13 +290,11 @@ export default function VentasPlu() {
                 <SubcatTable
                   titulo="Alimentos"
                   data={alimentos}
-                  colorStart={0}
                   onRowClick={s => setSubcat({ subcat: s, categoria: 'Alimentos' })}
                 />
                 <SubcatTable
                   titulo="Bebidas"
                   data={bebidas}
-                  colorStart={0}
                   onRowClick={s => setSubcat({ subcat: s, categoria: 'Bebidas' })}
                 />
               </div>
@@ -308,7 +307,6 @@ export default function VentasPlu() {
                   </p>
                   <DonutChart
                     data={alimentos}
-                    colorStart={0}
                     onSliceClick={s => setSubcat({ subcat: s, categoria: 'Alimentos' })}
                   />
                 </div>
@@ -318,7 +316,6 @@ export default function VentasPlu() {
                   </p>
                   <DonutChart
                     data={bebidas}
-                    colorStart={4}
                     onSliceClick={s => setSubcat({ subcat: s, categoria: 'Bebidas' })}
                   />
                 </div>
