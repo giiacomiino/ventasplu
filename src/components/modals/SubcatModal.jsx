@@ -194,9 +194,9 @@ function BarChart({ monthly, months, vista }) {
 // ─── Daily cumulative line chart (current vs previous month) ─────────────────
 
 function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
+  const [hoverIdx, setHoverIdx] = useState(null)
   const k = vista === '$$$' ? 'monto' : 'unidades'
 
-  // Aggregate per day-of-month for current and previous month
   const currDays = {}, prevDays = {}
   for (const [date, dv] of Object.entries(prod.days)) {
     const ym  = date.slice(0, 7)
@@ -206,9 +206,10 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
   }
 
   const nDays = maxDayInCurrent || 1
-  const days  = Array.from({ length: nDays }, (_, i) => i + 1)
+  if (nDays < 2) return null
 
-  // Build cumulative series
+  const days = Array.from({ length: nDays }, (_, i) => i + 1)
+
   let cc = 0, pc = 0
   const currCum = days.map(d => { cc += currDays[d] || 0; return cc })
   const prevCum = days.map(d => { pc += prevDays[d] || 0; return pc })
@@ -216,36 +217,46 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
   const maxVal = Math.max(...currCum, ...prevCum, 1)
   const hasPrev = prevCum.some(v => v > 0)
 
-  const CH = 100, PAD = { top: 26, right: 20, bottom: 26, left: 10 }
+  const CH = 100, PAD = { top: 28, right: 20, bottom: 34, left: 10 }
   const W = 520, VH = PAD.top + CH + PAD.bottom
   const CW = W - PAD.left - PAD.right
+  const colW = CW / (nDays - 1)
 
-  const xOf = d => PAD.left + ((d - 1) / Math.max(nDays - 1, 1)) * CW
+  const xOf = d => PAD.left + ((d - 1) / (nDays - 1)) * CW
   const yOf = v => PAD.top + CH - (v / maxVal) * CH
 
-  const path = cums =>
+  const makePath = cums =>
     cums.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xOf(days[i])} ${yOf(v)}`).join(' ')
 
   const fmtV = v => vista === '$$$'
     ? (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`)
     : (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))
 
-  const currLabel = format(new Date(+currentYm.split('-')[0], +currentYm.split('-')[1] - 1, 1), 'MMM', { locale: es })
-  const prevLabel = prevYm ? format(new Date(+prevYm.split('-')[0], +prevYm.split('-')[1] - 1, 1), 'MMM', { locale: es }) : null
+  const [cy0, cm0] = currentYm.split('-').map(Number)
+  const currMonLabel = format(new Date(cy0, cm0 - 1, 1), 'MMM', { locale: es })
+  const prevMonLabel = prevYm
+    ? format(new Date(+prevYm.split('-')[0], +prevYm.split('-')[1] - 1, 1), 'MMM', { locale: es })
+    : null
 
-  // Show cumulative value label at day 5, 10, 15, 20, 25 and last day
-  const labelSet = new Set([5, 10, 15, 20, 25, nDays])
+  // Which days get an axis label
+  const xLabelDays = [...new Set([1, ...days.filter(d => d % 5 === 0), nDays])]
+  // Which days get an inline cumulative label (hide if currently hovered)
+  const cumLabelSet = new Set([5, 10, 15, 20, 25, nDays])
 
   return (
-    <div>
+    <div className="relative select-none" onMouseLeave={() => setHoverIdx(null)}>
       {/* Legend */}
-      <div className="flex items-center gap-4 mb-1 justify-end">
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold">
-          <div className="w-5 h-[2px] rounded bg-[#b45309]" /> {currLabel}
+      <div className="flex items-center gap-4 mb-1.5 justify-end">
+        <div className="flex items-center gap-1.5 text-[10px] text-gray-700 font-semibold">
+          <div className="w-5 h-[2px] rounded bg-[#b45309]" />
+          <span className="capitalize">{currMonLabel}</span>
         </div>
-        {hasPrev && prevLabel && (
+        {hasPrev && prevMonLabel && (
           <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-            <div className="w-5 h-[1.5px] rounded bg-[#f59e0b]" style={{ opacity: 0.7 }} /> {prevLabel}
+            <svg width="20" height="4" viewBox="0 0 20 4">
+              <line x1="0" y1="2" x2="20" y2="2" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4,2" />
+            </svg>
+            <span className="capitalize">{prevMonLabel}</span>
           </div>
         )}
       </div>
@@ -259,57 +270,66 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
             stroke="#f3f4f6" strokeWidth={1} />
         ))}
 
-        {/* Previous month area + line */}
-        {hasPrev && (
+        {/* X axis baseline */}
+        <line x1={PAD.left} y1={PAD.top + CH} x2={PAD.left + CW} y2={PAD.top + CH}
+          stroke="#e5e7eb" strokeWidth={1} />
+
+        {/* Prev area + line */}
+        {hasPrev && prevCum.some(v => v > 0) && (
           <>
-            <path
-              d={`${path(prevCum)} L ${xOf(days.at(-1))} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
+            <path d={`${makePath(prevCum)} L ${xOf(nDays)} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
               fill="#f59e0b" fillOpacity={0.05} />
-            <path d={path(prevCum)} fill="none" stroke="#f59e0b" strokeWidth={1.5}
-              strokeDasharray="5,3" strokeOpacity={0.7}
-              strokeLinejoin="round" strokeLinecap="round" />
+            <path d={makePath(prevCum)} fill="none" stroke="#f59e0b" strokeWidth={1.5}
+              strokeDasharray="5,3" strokeOpacity={0.75} strokeLinejoin="round" strokeLinecap="round" />
           </>
         )}
 
-        {/* Current month area + line */}
+        {/* Current area + line */}
         {currCum.some(v => v > 0) && (
           <>
-            <path
-              d={`${path(currCum)} L ${xOf(days.at(-1))} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
-              fill="#b45309" fillOpacity={0.07} />
-            <path d={path(currCum)} fill="none" stroke="#b45309" strokeWidth={2}
+            <path d={`${makePath(currCum)} L ${xOf(nDays)} ${PAD.top + CH} L ${xOf(1)} ${PAD.top + CH} Z`}
+              fill="#b45309" fillOpacity={0.08} />
+            <path d={makePath(currCum)} fill="none" stroke="#b45309" strokeWidth={2}
               strokeLinejoin="round" strokeLinecap="round" />
           </>
         )}
 
-        {/* Dots and cumulative labels */}
+        {/* Hover crosshair */}
+        {hoverIdx !== null && (
+          <line
+            x1={xOf(days[hoverIdx])} y1={PAD.top}
+            x2={xOf(days[hoverIdx])} y2={PAD.top + CH}
+            stroke="#d1d5db" strokeWidth={1} strokeDasharray="3,2" />
+        )}
+
+        {/* Dots + inline cumulative labels */}
         {days.map((d, i) => {
           const cx    = xOf(d)
           const cy    = yOf(currCum[i])
           const pyVal = prevCum[i]
           const py    = pyVal > 0 ? yOf(pyVal) : null
-          const isLast  = i === days.length - 1
-          const showLbl = labelSet.has(d) && currCum[i] > 0
-
-          // Anchor: last day → right-align, otherwise center
-          const anchor = isLast ? 'end' : 'middle'
+          const isLast = i === days.length - 1
+          const isHov  = hoverIdx === i
+          const showLbl = cumLabelSet.has(d) && currCum[i] > 0 && !isHov
 
           return (
             <g key={d}>
-              {currDays[d] > 0 && (
-                <circle cx={cx} cy={cy} r={isLast ? 4 : 2.5} fill="#b45309" stroke="white" strokeWidth={1.5} />
+              {currCum[i] > 0 && (
+                <circle cx={cx} cy={cy} r={isHov || isLast ? 4.5 : 2.5}
+                  fill="#b45309" stroke="white" strokeWidth={isHov ? 2 : 1.5} />
               )}
-              {hasPrev && prevDays[d] > 0 && py !== null && (
-                <circle cx={cx} cy={py} r={2} fill="#f59e0b" stroke="white" strokeWidth={1} fillOpacity={0.85} />
+              {hasPrev && pyVal > 0 && py !== null && (
+                <circle cx={cx} cy={py} r={isHov ? 3.5 : 2}
+                  fill="#f59e0b" stroke="white" strokeWidth={isHov ? 1.5 : 1} fillOpacity={0.85} />
               )}
               {showLbl && (
-                <text x={cx} y={cy - 7} textAnchor={anchor} fill="#78350f" fontSize={8} fontWeight="700">
+                <text x={cx} y={cy - 8} textAnchor={isLast ? 'end' : 'middle'}
+                  fill="#78350f" fontSize={8} fontWeight="700">
                   {fmtV(currCum[i])}
                 </text>
               )}
-              {/* Previous cumulative label at last point */}
-              {isLast && hasPrev && pyVal > 0 && py !== null && (
-                <text x={cx} y={py - 7} textAnchor="end" fill="#b45309" fontSize={7} fillOpacity={0.6}>
+              {isLast && hasPrev && pyVal > 0 && py !== null && !isHov && (
+                <text x={cx} y={py - 8} textAnchor="end" fill="#d97706" fontSize={7} fontWeight="600">
                   {fmtV(pyVal)}
                 </text>
               )}
@@ -317,13 +337,90 @@ function DailyLineChart({ prod, currentYm, prevYm, maxDayInCurrent, vista }) {
           )
         })}
 
-        {/* X axis: show day numbers at intervals */}
-        {days.filter(d => d === 1 || d % 5 === 0 || d === nDays).map(d => (
-          <text key={d} x={xOf(d)} y={VH - 5} textAnchor="middle" fill="#9ca3af" fontSize={8}>
-            {d}
-          </text>
+        {/* X axis ticks + labels */}
+        {xLabelDays.map(d => {
+          const x       = xOf(d)
+          const isFirst = d === 1
+          const isLast  = d === nDays
+          const anchor  = isFirst ? 'start' : isLast ? 'end' : 'middle'
+          const lbl     = isFirst ? `1 ${currMonLabel}`
+                        : isLast && d % 5 !== 0 ? `${d} ${currMonLabel}`
+                        : `${d}`
+          return (
+            <g key={d}>
+              <line x1={x} y1={PAD.top + CH} x2={x} y2={PAD.top + CH + 5}
+                stroke="#d1d5db" strokeWidth={1} />
+              <text x={x} y={PAD.top + CH + 16} textAnchor={anchor}
+                fill="#6b7280" fontSize={9}
+                fontWeight={isFirst || isLast ? '600' : '400'}>
+                {lbl}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* Invisible hover columns for mouse events */}
+        {days.map((d, i) => (
+          <rect key={`h${d}`}
+            x={Math.max(PAD.left, xOf(d) - colW / 2)}
+            y={PAD.top} width={colW} height={CH}
+            fill="transparent"
+            onMouseEnter={() => setHoverIdx(i)} />
         ))}
       </svg>
+
+      {/* Tooltip */}
+      {hoverIdx !== null && (() => {
+        const d    = days[hoverIdx]
+        const cDay = currDays[d] || 0
+        const pDay = prevDays[d] || 0
+        const cCum = currCum[hoverIdx]
+        const pCum = prevCum[hoverIdx]
+        const onRight = hoverIdx > nDays * 0.55
+        const dateLabel = format(new Date(cy0, cm0 - 1, d), "d 'de' MMMM", { locale: es })
+
+        return (
+          <div className={`absolute top-7 pointer-events-none z-20 bg-white border border-gray-100 rounded-xl shadow-lg px-3 py-2.5 min-w-[155px] ${onRight ? 'right-2' : 'left-2'}`}>
+            <p className="text-xs font-bold text-gray-700 capitalize border-b border-gray-50 pb-1.5 mb-2">
+              {dateLabel}
+            </p>
+            {/* Current month */}
+            <div className="flex items-center gap-1.5 mb-1">
+              <div className="w-2 h-2 rounded-sm bg-[#b45309] flex-shrink-0" />
+              <span className="text-[10px] text-gray-600 font-semibold capitalize">{currMonLabel}</span>
+            </div>
+            <div className="pl-3.5 space-y-0.5 mb-2">
+              <div className="flex justify-between gap-6 text-[10px]">
+                <span className="text-gray-400">Día</span>
+                <span className="font-bold text-gray-800 tabular-nums">{cDay ? fmtV(cDay) : '—'}</span>
+              </div>
+              <div className="flex justify-between gap-6 text-[10px]">
+                <span className="text-gray-400">Acumulado</span>
+                <span className="font-bold text-[#78350f] tabular-nums">{fmtV(cCum)}</span>
+              </div>
+            </div>
+            {/* Prev month */}
+            {hasPrev && (
+              <>
+                <div className="flex items-center gap-1.5 mb-1 border-t border-gray-50 pt-2">
+                  <div className="w-2 h-2 rounded-sm bg-[#f59e0b] flex-shrink-0 opacity-80" />
+                  <span className="text-[10px] text-gray-400 capitalize">{prevMonLabel}</span>
+                </div>
+                <div className="pl-3.5 space-y-0.5">
+                  <div className="flex justify-between gap-6 text-[10px]">
+                    <span className="text-gray-400">Día</span>
+                    <span className="font-medium text-gray-500 tabular-nums">{pDay ? fmtV(pDay) : '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-6 text-[10px]">
+                    <span className="text-gray-400">Acumulado</span>
+                    <span className="font-semibold text-gray-500 tabular-nums">{fmtV(pCum)}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
