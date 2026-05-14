@@ -7,7 +7,8 @@ import RegistrarDiaModal   from '../components/modals/RegistrarDiaModal'
 import ListaProductosModal from '../components/modals/ListaProductosModal'
 import AuditarDiaModal     from '../components/modals/AuditarDiaModal'
 import AnalisisModal       from '../components/modals/AnalisisModal'
-import { Plus, List, Eye, BarChart2, TrendingUp, TrendingDown } from 'lucide-react'
+import DescargarExcelModal from '../components/modals/DescargarExcelModal'
+import { Plus, List, Eye, BarChart2, TrendingUp, TrendingDown, Download } from 'lucide-react'
 import { formatMoney, formatUnits } from '../utils/formatters'
 import { toLabel } from '../utils/dateHelpers'
 import { format } from 'date-fns'
@@ -21,7 +22,7 @@ const PALETTE = [
 
 const MODAL = {
   REGISTRAR: 'registrar', PRODUCTOS: 'productos',
-  AUDITAR: 'auditar', ANALISIS: 'analisis',
+  AUDITAR: 'auditar', ANALISIS: 'analisis', DESCARGAR: 'descargar',
 }
 
 // ─── MoM badge ────────────────────────────────────────────────────────────────
@@ -262,6 +263,9 @@ export default function VentasPlu() {
             <button onClick={() => setModal(MODAL.ANALISIS)} className={btnAltClass}>
               <BarChart2 size={15} className="text-gold-600" /> Análisis
             </button>
+            <button onClick={() => setModal(MODAL.DESCARGAR)} className={btnAltClass}>
+              <Download size={15} /> Excel
+            </button>
             <MonthPicker value={mes} onChange={setMes} />
           </div>
         </div>
@@ -355,6 +359,7 @@ export default function VentasPlu() {
       {modal === MODAL.PRODUCTOS && <ListaProductosModal onClose={() => setModal(null)} />}
       {modal === MODAL.AUDITAR   && <AuditarDiaModal     onClose={() => setModal(null)} />}
       {modal === MODAL.ANALISIS  && <AnalisisModal       onClose={() => setModal(null)} />}
+      {modal === MODAL.DESCARGAR && <DescargarExcelModal onClose={() => setModal(null)} />}
 
       {subcat && (
         <SubcatModal
