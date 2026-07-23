@@ -238,7 +238,7 @@ export default function VentasPlu() {
   const btnAltClass = "flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm"
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <div className="max-w-7xl mx-auto px-6 py-6">
 
         {/* ── Header ── */}
@@ -369,6 +369,6 @@ export default function VentasPlu() {
           onClose={() => setSubcat(null)}
         />
       )}
-    </div>
+    </>
   )
 }

@@ -11,6 +11,7 @@
    - Copia `.env.example` a `.env`
    - Rellena `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`
    - En Supabase Dashboard → SQL Editor → ejecuta el contenido de `supabase/schema.sql`
+   - Luego ejecuta `supabase/auth_setup.sql` (login y roles) y sigue las instrucciones al final de ese archivo para crear tu usuario Owner
 
 3. Correr en desarrollo:
    ```bash
