@@ -55,7 +55,7 @@ function GraficaProveedor({ serieMensual, impliedBudget }) {
 }
 
 function FacturasProveedor({ facturas }) {
-  if (facturas.length === 0) return <p className="text-xs text-gray-300 py-3">Sin facturas este mes</p>
+  if (facturas.length === 0) return <p className="text-xs text-gray-300 py-3">Sin facturas pagadas este mes</p>
   return (
     <table className="w-full text-xs mt-1">
       <thead>
@@ -80,31 +80,13 @@ function FacturasProveedor({ facturas }) {
   )
 }
 
-function ProveedorRolling({ p, categoria, anio, mes }) {
+function ProveedorRolling({ p }) {
   const [abierto, setAbierto] = useState(false)
-  const [detalle, setDetalle] = useState(null)
-  const [cargando, setCargando] = useState(false)
-  const [error, setError] = useState('')
-
   const { color } = estadoPresupuesto(p.pct)
-
-  async function toggle() {
-    if (!abierto && !detalle) {
-      setCargando(true)
-      try {
-        const d = await llamar('presupuesto-proveedor', { categoria, proveedor: p.nombre, anio, mes })
-        setDetalle(d)
-      } catch (e) {
-        setError(e.message)
-      }
-      setCargando(false)
-    }
-    setAbierto(!abierto)
-  }
 
   return (
     <div>
-      <button onClick={toggle} className="w-full text-left py-3 px-3 -mx-3 rounded-lg hover:bg-gray-50 transition-colors">
+      <button onClick={() => setAbierto(a => !a)} className="w-full text-left py-3 px-3 -mx-3 rounded-lg hover:bg-gray-50 transition-colors">
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={13} className="text-gray-300 flex-shrink-0" /> : <ChevronDown size={13} className="text-gray-300 flex-shrink-0" />}
@@ -123,49 +105,25 @@ function ProveedorRolling({ p, categoria, anio, mes }) {
 
       {abierto && (
         <div className="ml-5 mb-3 pl-4 border-l-2 border-gray-100">
-          {cargando && <LoadingState>Cargando...</LoadingState>}
-          {error && <p className="text-xs text-red-500 py-2">{error}</p>}
-          {detalle && (
-            <>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 mt-2">
-                Últimos 6 meses vs. presupuesto implícito
-              </p>
-              <GraficaProveedor serieMensual={detalle.serieMensual} impliedBudget={p.impliedBudget} />
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-1">Facturas del mes en curso</p>
-              <FacturasProveedor facturas={detalle.facturas} />
-            </>
-          )}
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 mt-2">
+            Últimos 6 meses vs. presupuesto implícito
+          </p>
+          <GraficaProveedor serieMensual={p.serieMensual} impliedBudget={p.impliedBudget} />
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-1">Facturas pagadas del mes en curso</p>
+          <FacturasProveedor facturas={p.facturas} />
         </div>
       )}
     </div>
   )
 }
 
-function CategoriaRow({ c, anio, mes }) {
+function CategoriaRow({ c, detalle, cargandoArbol }) {
   const [abierto, setAbierto] = useState(false)
-  const [detalle, setDetalle] = useState(null)
-  const [cargando, setCargando] = useState(false)
-  const [error, setError] = useState('')
-
   const { color } = estadoPresupuesto(c.porcentajeUtilizado)
-
-  async function toggle() {
-    if (!abierto && !detalle) {
-      setCargando(true)
-      try {
-        const d = await llamar('presupuesto-categoria', { categoria: c.nombre, anio, mes })
-        setDetalle(d)
-      } catch (e) {
-        setError(e.message)
-      }
-      setCargando(false)
-    }
-    setAbierto(!abierto)
-  }
 
   return (
     <div className="border-b border-gray-50 last:border-0">
-      <button onClick={toggle} className="w-full text-left py-4 hover:bg-gray-50/60 transition-colors px-1">
+      <button onClick={() => setAbierto(a => !a)} className="w-full text-left py-4 hover:bg-gray-50/60 transition-colors px-1">
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={15} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />}
@@ -184,8 +142,7 @@ function CategoriaRow({ c, anio, mes }) {
 
       {abierto && (
         <div className="ml-6 mb-4 pl-4 border-l-2 border-gray-100">
-          {cargando && <LoadingState>Cargando proveedores...</LoadingState>}
-          {error && <p className="text-xs text-red-500 py-2">{error}</p>}
+          {cargandoArbol && !detalle && <LoadingState>Cargando proveedores...</LoadingState>}
           {detalle && (
             <>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 mt-2">
@@ -195,9 +152,7 @@ function CategoriaRow({ c, anio, mes }) {
                 {detalle.proveedores.length === 0 ? (
                   <p className="text-xs text-gray-300 py-3">Sin proveedores en el periodo</p>
                 ) : (
-                  detalle.proveedores.map(p => (
-                    <ProveedorRolling key={p.nombre} p={p} categoria={c.nombre} anio={anio} mes={mes} />
-                  ))
+                  detalle.proveedores.map(p => <ProveedorRolling key={p.nombre} p={p} />)
                 )}
               </div>
             </>
@@ -233,6 +188,8 @@ export default function BIPresupuesto() {
   const [tendencias, setTendencias] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [arbol, setArbol] = useState(null)
+  const [cargandoArbol, setCargandoArbol] = useState(true)
 
   useEffect(() => {
     setLoading(true)
@@ -242,6 +199,15 @@ export default function BIPresupuesto() {
       setError(r1.status === 'rejected' ? r1.reason.message : r2.status === 'rejected' ? r2.reason.message : '')
       setLoading(false)
     })
+  }, [anio, mes])
+
+  useEffect(() => {
+    setArbol(null)
+    setCargandoArbol(true)
+    llamar('presupuesto-arbol', { anio, mes })
+      .then(setArbol)
+      .catch(() => {})
+      .finally(() => setCargandoArbol(false))
   }, [anio, mes])
 
   return (
@@ -275,7 +241,12 @@ export default function BIPresupuesto() {
               </div>
               <div className="px-6 pb-2">
                 {negocio.presupuesto.categorias.map(c => (
-                  <CategoriaRow key={`${c.nombre}-${anio}-${mes}`} c={c} anio={anio} mes={mes} />
+                  <CategoriaRow
+                    key={`${c.nombre}-${anio}-${mes}`}
+                    c={c}
+                    detalle={arbol?.categorias.find(a => a.nombre === c.nombre) ?? null}
+                    cargandoArbol={cargandoArbol}
+                  />
                 ))}
               </div>
             </Card>

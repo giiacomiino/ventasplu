@@ -52,6 +52,44 @@ export async function bubbleGetAll(
   return results
 }
 
+// Igual que bubbleGetAll pero pagina en paralelo (por tandas) en vez de
+// una página a la vez. El cursor de Bubble es un offset numérico, no un
+// token opaco, así que una vez que sabemos el total (primera página +
+// remaining) podemos pedir el resto de las páginas de golpe. Para
+// consultas grandes (varios miles de filas) esto es varias veces más
+// rápido que bubbleGetAll.
+export async function bubbleGetAllFast(
+  bubbleUrl: string,
+  bubbleToken: string,
+  type: string,
+  constraints: unknown[],
+  maxPages = 200,
+) {
+  const primera = await bubbleGet(bubbleUrl, bubbleToken, type, {
+    constraints: JSON.stringify(constraints),
+    limit: '100',
+    cursor: '0',
+  })
+  const results: any[] = [...primera.response.results]
+  const total = primera.response.results.length + (primera.response.remaining ?? 0)
+  const totalPaginas = Math.min(Math.ceil(total / 100), maxPages)
+
+  const TANDA = 10
+  for (let inicio = 1; inicio < totalPaginas; inicio += TANDA) {
+    const paginas = []
+    for (let page = inicio; page < Math.min(inicio + TANDA, totalPaginas); page++) paginas.push(page)
+    const datas = await Promise.all(
+      paginas.map(page => bubbleGet(bubbleUrl, bubbleToken, type, {
+        constraints: JSON.stringify(constraints),
+        limit: '100',
+        cursor: String(page * 100),
+      })),
+    )
+    for (const d of datas) results.push(...d.response.results)
+  }
+  return results
+}
+
 // Bubble usa 1=lunes ... 7=domingo (ISO weekday).
 export function isoWeekday(dateStr: string) {
   const d = new Date(dateStr)
