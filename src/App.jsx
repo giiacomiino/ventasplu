@@ -10,6 +10,7 @@ import BIPagos from './pages/bi/Pagos'
 import BIVentasPlu from './pages/bi/VentasPlu'
 import BIRH from './pages/bi/RH'
 import BIFinanciero from './pages/bi/Financiero'
+import BITendenciaCierre from './pages/bi/TendenciaCierre'
 import Login from './pages/Login'
 import Usuarios from './pages/Usuarios'
 import { MesProvider } from './pages/bi/mesContext'
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/business-intelligence/ventas-plu" element={<BIVentasPlu />} />
             <Route path="/business-intelligence/rh" element={<BIRH />} />
             <Route path="/business-intelligence/financiero" element={<BIFinanciero />} />
+            <Route path="/business-intelligence/tendencia-cierre" element={<BITendenciaCierre />} />
           </Route>
         </Route>
 

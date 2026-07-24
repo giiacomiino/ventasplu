@@ -479,6 +479,17 @@ export default function BIOverview() {
             </div>
           </DomainCard>
         )}
+
+        <DomainCard
+          to="/business-intelligence/tendencia-cierre"
+          titulo="Tendencia de cierre"
+          sub="Cómo vamos a cerrar el mes, no cómo vamos hoy"
+          span={2}
+        >
+          <p className="text-sm text-gray-400 py-2">
+            Proyección de venta, costo y margen al cierre — por categoría y proveedor, con pagos pendientes hasta fin de mes.
+          </p>
+        </DomainCard>
       </div>
     </div>
   )
