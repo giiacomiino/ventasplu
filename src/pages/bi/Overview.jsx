@@ -129,6 +129,7 @@ export default function BIOverview() {
   const [pagos, setPagos] = useState(null)
   const [rh, setRh] = useState(null)
   const [financiero, setFinanciero] = useState(null)
+  const [cierre, setCierre] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [actualizado, setActualizado] = useState(Date.now())
@@ -143,14 +144,16 @@ export default function BIOverview() {
       llamar('resumen-pagos'),
       llamar('resumen-rh'),
       llamar('resumen-financiero'),
-    ]).then(([r1, r2, r3, r4, r5, r6]) => {
+      llamar('tendencia-cierre'),
+    ]).then(([r1, r2, r3, r4, r5, r6, r7]) => {
       if (r1.status === 'fulfilled') setVentas(r1.value)
       if (r2.status === 'fulfilled') setAnual(r2.value)
       if (r3.status === 'fulfilled') setNegocio(r3.value)
       if (r4.status === 'fulfilled') setPagos(r4.value)
       if (r5.status === 'fulfilled') setRh(r5.value)
       if (r6.status === 'fulfilled') setFinanciero(r6.value)
-      const err = [r1, r2, r3, r4, r5, r6].find(r => r.status === 'rejected')
+      if (r7.status === 'fulfilled') setCierre(r7.value)
+      const err = [r1, r2, r3, r4, r5, r6, r7].find(r => r.status === 'rejected')
       setError(err ? err.reason.message : '')
       setLoading(false)
       setActualizado(Date.now())
@@ -168,6 +171,14 @@ export default function BIOverview() {
   const mtd = ventas?.mtd
   const categoriasRiesgo = negocio?.presupuesto?.categorias?.filter(c => (c.porcentajeUtilizado ?? 0) >= 0.9) ?? []
   const pctPresupuesto = negocio?.presupuesto?.totalLimite ? negocio.presupuesto.totalGastoReal / negocio.presupuesto.totalLimite : null
+
+  const ventaProyectadaCierre = mtd?.esMesActual ? mtd.proyeccionCierreMes : mtd?.ventaNeta
+  const margenOperacionProyectado = cierre && ventaProyectadaCierre != null
+    ? ventaProyectadaCierre - cierre.totales.costoDirectoProyectado - cierre.totales.gastosOperacionProyectado
+    : null
+  const margenOperacionYoyPct = margenOperacionProyectado != null && cierre?.margenAnioAnterior?.margenOperacion
+    ? ((margenOperacionProyectado - cierre.margenAnioAnterior.margenOperacion) / cierre.margenAnioAnterior.margenOperacion) * 100
+    : null
 
   let topPlu = []
   if (historialPlu) {
@@ -480,16 +491,28 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        <DomainCard
-          to="/business-intelligence/tendencia-cierre"
-          titulo="Tendencia de cierre"
-          sub="Cómo vamos a cerrar el mes, no cómo vamos hoy"
-          span={2}
-        >
-          <p className="text-sm text-gray-400 py-2">
-            Proyección de venta, costo y margen al cierre — por categoría y proveedor, con pagos pendientes hasta fin de mes.
-          </p>
-        </DomainCard>
+        {cierre && (
+          <DomainCard
+            to="/business-intelligence/tendencia-cierre"
+            titulo="Tendencia de cierre"
+            sub="Cómo vamos a cerrar el mes, no cómo vamos hoy"
+            span={2}
+          >
+            <div className="flex items-center gap-6 py-1">
+              <DonutGauge
+                pct={ventaProyectadaCierre ? (margenOperacionProyectado ?? 0) / ventaProyectadaCierre : 0}
+                color={GOLD_RAMP[1]}
+                size={92}
+                stroke={9}
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Margen de operación proyectado</p>
+                <p className="text-2xl font-bold text-gray-900 tabular-nums mb-1.5 truncate">{formatMoney(margenOperacionProyectado)}</p>
+                <DeltaPill pct={margenOperacionYoyPct} suffix=" YoY" />
+              </div>
+            </div>
+          </DomainCard>
+        )}
       </div>
     </div>
   )

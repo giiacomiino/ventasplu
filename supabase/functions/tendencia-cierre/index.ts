@@ -34,8 +34,12 @@ Deno.serve(async (req) => {
     const inicioVentana = new Date(Date.UTC(anioSel, mes0Sel - 6, 1))
     const diasDelMes = new Date(Date.UTC(anioSel, mes0Sel + 1, 0)).getUTCDate()
     const diasTranscurridos = esMesActual ? hoyReal.getUTCDate() : diasDelMes
+    // mismo mes, un año antes: para comparar el margen proyectado contra
+    // el margen real de ese mismo mes (YoY), no solo contra el límite.
+    const inicioMesAnioAnt = new Date(Date.UTC(anioSel - 1, mes0Sel, 1))
+    const finMesAnioAnt = new Date(Date.UTC(anioSel - 1, mes0Sel + 1, 0, 23, 59, 59))
 
-    const [categoriasData, snapshotsData, historicasCrudas, delMesCrudas, pendientesCrudas] = await Promise.all([
+    const [categoriasData, snapshotsData, historicasCrudas, delMesCrudas, pendientesCrudas, ventaHistoricaData, mesAnioAntCrudas, ventaMesAnioAntData] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Categorías', { constraints: JSON.stringify(conOrg()), limit: '100' }),
       bubbleGet(bubbleUrl, bubbleToken, 'BudgetSnapshot', {
         constraints: JSON.stringify(conOrg()),
@@ -58,6 +62,19 @@ Deno.serve(async (req) => {
         { key: 'FechaDePago', constraint_type: 'less than', value: finMesSel.toISOString() },
         { key: 'borrada?', constraint_type: 'equals', value: false },
       )),
+      bubbleGetAllFast(bubbleUrl, bubbleToken, 'Venta', conOrg(
+        { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioVentana.toISOString() },
+        { key: 'DiaDeVenta', constraint_type: 'less than', value: inicioMesSel.toISOString() },
+      )),
+      bubbleGetAllFast(bubbleUrl, bubbleToken, 'Inventario', conOrg(
+        { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioMesAnioAnt.toISOString() },
+        { key: 'FechaDeIngreso', constraint_type: 'less than', value: finMesAnioAnt.toISOString() },
+        { key: 'borrada?', constraint_type: 'equals', value: false },
+      )),
+      bubbleGetAllFast(bubbleUrl, bubbleToken, 'Venta', conOrg(
+        { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioMesAnioAnt.toISOString() },
+        { key: 'DiaDeVenta', constraint_type: 'less than', value: finMesAnioAnt.toISOString() },
+      )),
     ])
 
     const tipoPorNombre = new Map(
@@ -79,6 +96,46 @@ Deno.serve(async (req) => {
     const historicas = historicasCrudas.filter((f: any) => f['borrada?'] !== true)
     const delMes = delMesCrudas.filter((f: any) => f['borrada?'] !== true)
     const pendientes = pendientesCrudas.filter((f: any) => f['borrada?'] !== true && f['Pagada?'] !== true)
+    const mesAnioAnt = mesAnioAntCrudas.filter((f: any) => f['borrada?'] !== true)
+
+    // ── Tendencia histórica de margen (últimos 6 meses reales, cerrados) ──
+    const ventaPorMes = new Map<string, number>()
+    for (const v of ventaHistoricaData) {
+      const key = (v.DiaDeVenta as string).slice(0, 7)
+      ventaPorMes.set(key, (ventaPorMes.get(key) ?? 0) + (v.VentaNeta || 0))
+    }
+    const gastoPorMesYTipo = new Map<string, { costoDirecto: number; gastosOperacion: number }>()
+    for (const f of historicas) {
+      const key = (f.FechaDeIngreso as string).slice(0, 7)
+      const tipo = tipoPorNombre.get(f['Categoría']) ?? 'Sin tipo'
+      const acc = gastoPorMesYTipo.get(key) ?? { costoDirecto: 0, gastosOperacion: 0 }
+      if (tipo === 'Costo Directo') acc.costoDirecto += f.MontoSinIVA || 0
+      else if (tipo === 'Gastos de Operacion') acc.gastosOperacion += f.MontoSinIVA || 0
+      gastoPorMesYTipo.set(key, acc)
+    }
+
+    const tendenciaMensual = []
+    for (let i = 6; i >= 1; i--) {
+      const d = new Date(Date.UTC(anioSel, mes0Sel - i, 1))
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+      const venta = ventaPorMes.get(key) ?? 0
+      const gasto = gastoPorMesYTipo.get(key) ?? { costoDirecto: 0, gastosOperacion: 0 }
+      const margenBruto = venta - gasto.costoDirecto
+      const margenOperacion = margenBruto - gasto.gastosOperacion
+      tendenciaMensual.push({ mes: key, margenBruto, margenOperacion })
+    }
+
+    // ── Margen del mismo mes, año anterior (referencia YoY) ────────────
+    const ventaMesAnioAnt = ventaMesAnioAntData.reduce((s: number, v: any) => s + (v.VentaNeta || 0), 0)
+    let costoDirectoAnioAnt = 0
+    let gastosOperacionAnioAnt = 0
+    for (const f of mesAnioAnt) {
+      const tipo = tipoPorNombre.get(f['Categoría']) ?? 'Sin tipo'
+      if (tipo === 'Costo Directo') costoDirectoAnioAnt += f.MontoSinIVA || 0
+      else if (tipo === 'Gastos de Operacion') gastosOperacionAnioAnt += f.MontoSinIVA || 0
+    }
+    const margenBrutoAnioAnt = ventaMesAnioAnt - costoDirectoAnioAnt
+    const margenOperacionAnioAnt = margenBrutoAnioAnt - gastosOperacionAnioAnt
 
     const clave = (cat: string, prov: string) => `${cat}||${prov}`
 
@@ -123,6 +180,11 @@ Deno.serve(async (req) => {
       for (const key of histPorCategoriaProveedor.keys()) if (key.startsWith(prefijo)) nombresProveedores.add(key.slice(prefijo.length))
       for (const key of registradoPorCategoriaProveedor.keys()) if (key.startsWith(prefijo)) nombresProveedores.add(key.slice(prefijo.length))
 
+      // total histórico de la categoría, para repartir su límite entre
+      // proveedores según su % histórico (mismo criterio que Presupuesto)
+      let totalHistoricoCategoria = 0
+      for (const p of nombresProveedores) totalHistoricoCategoria += (histPorCategoriaProveedor.get(clave(nombre, p))?.monto ?? 0)
+
       const proveedores = [...nombresProveedores].map(prov => {
         const key = clave(nombre, prov)
         const hist = histPorCategoriaProveedor.get(key) ?? { count: 0, monto: 0 }
@@ -138,6 +200,9 @@ Deno.serve(async (req) => {
         const gastoAdicionalProyectado = facturasFaltantes * montoPromedioFactura
         const gastoProyectado = registrado.monto + gastoAdicionalProyectado
 
+        const share = totalHistoricoCategoria ? hist.monto / totalHistoricoCategoria : null
+        const impliedBudget = limiteMes != null && share != null ? limiteMes * share : null
+
         return {
           nombre: prov,
           facturasRegistradas: registrado.count,
@@ -147,6 +212,8 @@ Deno.serve(async (req) => {
           facturasFaltantes,
           gastoAdicionalProyectado,
           gastoProyectado,
+          impliedBudget,
+          pct: impliedBudget ? gastoProyectado / impliedBudget : null,
         }
       }).sort((a, b) => b.gastoProyectado - a.gastoProyectado)
 
@@ -206,6 +273,12 @@ Deno.serve(async (req) => {
         hastaFinDeMes: totalPendienteHastaCierre,
         facturas: pendientes.length,
         porProveedor: pagosPorProveedor,
+      },
+      tendenciaMensual,
+      margenAnioAnterior: {
+        ventaNeta: ventaMesAnioAnt,
+        margenBruto: margenBrutoAnioAnt,
+        margenOperacion: margenOperacionAnioAnt,
       },
     })
   } catch (e) {
