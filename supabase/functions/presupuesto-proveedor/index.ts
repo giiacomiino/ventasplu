@@ -1,24 +1,29 @@
-import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requireProfile } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireProfile(req)
+  const user = await requireRole(req, ['owner', 'admin'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
-  const { categoria, proveedor } = await req.json().catch(() => ({}))
+  const { categoria, proveedor, anio, mes } = await req.json().catch(() => ({}))
   if (!categoria || !proveedor) return json({ error: 'Falta categoría o proveedor' }, 400)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()
 
   try {
-    const ahora = new Date()
-    const inicioVentana = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth() - 6, 1))
+    const hoyReal = new Date()
+    const anioSel = anio ?? hoyReal.getUTCFullYear()
+    const mes0Sel = (mes ?? hoyReal.getUTCMonth() + 1) - 1
+
+    const inicioVentana = new Date(Date.UTC(anioSel, mes0Sel - 6, 1))
+    const finVentana = new Date(Date.UTC(anioSel, mes0Sel + 1, 0, 23, 59, 59))
 
     const crudas = await bubbleGetAll(bubbleUrl, bubbleToken, 'Inventario', conOrg(
       { key: 'Categoría', constraint_type: 'equals', value: categoria },
       { key: 'Prooveedor', constraint_type: 'equals', value: proveedor },
       { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioVentana.toISOString() },
+      { key: 'FechaDeIngreso', constraint_type: 'less than', value: finVentana.toISOString() },
       { key: 'borrada?', constraint_type: 'equals', value: false },
     ))
     const facturas = crudas
@@ -33,19 +38,20 @@ Deno.serve(async (req) => {
 
     const serieMensual = []
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth() - i, 1))
+      const d = new Date(Date.UTC(anioSel, mes0Sel - i, 1))
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
       serieMensual.push({ mes: key, monto: porMes.get(key) ?? 0 })
     }
 
-    const inicioMesActual = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), 1)).toISOString()
-    const facturasMesActual = facturas.filter((f: any) => f.FechaDeIngreso >= inicioMesActual)
+    const inicioMesSel = new Date(Date.UTC(anioSel, mes0Sel, 1)).toISOString()
+    const finMesSel = new Date(Date.UTC(anioSel, mes0Sel + 1, 0, 23, 59, 59)).toISOString()
+    const facturasMesSel = facturas.filter((f: any) => f.FechaDeIngreso >= inicioMesSel && f.FechaDeIngreso <= finMesSel)
 
     return json({
       categoria,
       proveedor,
       serieMensual,
-      facturas: facturasMesActual.map((f: any) => ({
+      facturas: facturasMesSel.map((f: any) => ({
         fecha: f.FechaDeIngreso,
         monto: f.MontoSinIVA,
         descripcion: f.Descripcion,

@@ -80,6 +80,28 @@ export async function requireProfile(req: Request) {
   return profile ? user : null
 }
 
+// Igual que requireProfile, pero además exige que el rol del perfil esté en
+// la lista permitida (ej. Business Intelligence es solo owner/admin, no rh).
+export async function requireRole(req: Request, roles: string[]) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) return null
+
+  const admin = createClient(supabaseUrl, serviceKey)
+  const caller = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  })
+
+  const { data: { user } } = await caller.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await admin.from('profiles').select('rol').eq('id', user.id).single()
+  return profile && roles.includes(profile.rol) ? user : null
+}
+
 export function bubbleEnv() {
   return {
     bubbleUrl: Deno.env.get('BUBBLE_API_URL')!,

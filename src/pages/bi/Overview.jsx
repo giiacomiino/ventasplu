@@ -33,6 +33,7 @@ function DomainCard({ to, titulo, sub, children, span = 1 }) {
 // ─── Ventas: barras pareadas YoY + línea de promedio ───────────────────────
 
 function VentasChart({ serie, promedioGeneral }) {
+  const [hover, setHover] = useState(null)
   const fmtK = n => n == null ? '—' : `$${(n / 1000).toFixed(0)}k`
   const valores = serie.flatMap(s => [s.actual ?? 0, s.anterior ?? 0])
   // headroom del 12% para que la barra más alta no toque el borde del área
@@ -66,15 +67,28 @@ function VentasChart({ serie, promedioGeneral }) {
           {serie.map((s, i) => (
             <div key={i} className="flex-1 h-full flex items-end justify-center gap-1">
               {[
-                { val: s.actual, color: GOLD_RAMP[1], text: '#ffffff' },
-                { val: s.anterior, color: '#e5e2da', text: '#57534e' },
-              ].map((bar, bi) => {
+                { key: 'actual', val: s.actual, color: GOLD_RAMP[1], text: '#ffffff', etiqueta: 'Este año' },
+                { key: 'anterior', val: s.anterior, color: '#e5e2da', text: '#57534e', etiqueta: 'Año anterior' },
+              ].map(bar => {
                 const h = Math.max(((bar.val ?? 0) / max) * 100, bar.val ? 8 : 0)
+                const hk = `${i}-${bar.key}`
                 return (
-                  <div key={bi} className="flex-1 relative rounded-t-sm" style={{ height: `${h}%`, background: bar.color }}>
+                  <div
+                    key={bar.key}
+                    className="flex-1 relative rounded-t-sm cursor-pointer transition-opacity"
+                    style={{ height: `${h}%`, background: bar.color, opacity: hover === hk ? 0.75 : 1 }}
+                    onMouseEnter={() => setHover(hk)}
+                    onMouseLeave={() => setHover(null)}
+                  >
+                    {hover === hk && (
+                      <div className="absolute -top-2 -translate-y-full left-1/2 -translate-x-1/2 z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg pointer-events-none">
+                        <p className="font-semibold">{s.mes} · {bar.etiqueta}</p>
+                        <p className="text-gray-300">{formatMoney(bar.val)}</p>
+                      </div>
+                    )}
                     {bar.val != null && (
                       <span
-                        className="absolute top-1/2 left-0 right-0 -translate-y-1/2 text-center text-[9px] font-bold whitespace-nowrap"
+                        className="absolute top-1/2 left-0 right-0 -translate-y-1/2 text-center text-[10px] font-bold whitespace-nowrap"
                         style={{ color: bar.text }}
                       >
                         {fmtK(bar.val)}
@@ -197,7 +211,7 @@ export default function BIOverview() {
       {error && <ErrorState message={error} />}
 
       {/* ── KPI hero row ── */}
-      <div className="grid grid-cols-6 gap-5">
+      <div className="grid grid-cols-5 gap-5">
         {ayer && (
           <KpiTile
             label="Venta neta de ayer"
@@ -235,13 +249,6 @@ export default function BIOverview() {
                 {categoriasRiesgo.length > 0 ? `${categoriasRiesgo.length} en riesgo` : 'Todo bajo control'}
               </span>
             }
-          />
-        )}
-        {negocio?.proveedores && (
-          <KpiTile
-            label="Gasto proveedores"
-            value={formatMoney(negocio.proveedores.totalGastado)}
-            sub="mes en curso (30d)"
           />
         )}
         {pagos && (
@@ -285,18 +292,18 @@ export default function BIOverview() {
 
         {negocio?.presupuesto && (
           <DomainCard to="/business-intelligence/presupuesto" titulo="Presupuesto" sub={`Uso vs. límite por categoría · ${format(new Date(negocio.presupuesto.mes), 'MMMM', { locale: es })}`}>
-            <div className="h-full flex flex-col justify-center gap-8">
-              <div className="flex items-center justify-center gap-8 py-2">
-                <DonutGauge pct={pctPresupuesto ?? 0} color={estadoBurn(pctPresupuesto)} size={132} stroke={13} />
+            <div>
+              <div className="flex items-center justify-center gap-6 py-1 mb-6">
+                <DonutGauge pct={pctPresupuesto ?? 0} color={estadoBurn(pctPresupuesto)} size={104} stroke={11} />
                 <div className="text-center">
-                  <p className="text-xs text-gray-400 font-semibold mb-1.5">Ritmo vs. ideal</p>
-                  <p className="text-base font-bold" style={{ color: (pctPresupuesto ?? 0) > (negocio.presupuesto.ritmoIdeal ?? 0) ? '#ec835a' : GOOD }}>
+                  <p className="text-xs text-gray-400 font-semibold mb-1">Ritmo vs. ideal</p>
+                  <p className="text-sm font-bold" style={{ color: (pctPresupuesto ?? 0) > (negocio.presupuesto.ritmoIdeal ?? 0) ? '#ec835a' : GOOD }}>
                     {(pctPresupuesto ?? 0) > (negocio.presupuesto.ritmoIdeal ?? 0) ? 'Por arriba del ideal' : 'Dentro del ideal'}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">Día {negocio.presupuesto.diasTranscurridos} de {negocio.presupuesto.diasDelMes}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Día {negocio.presupuesto.diasTranscurridos} de {negocio.presupuesto.diasDelMes}</p>
                 </div>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {negocio.presupuesto.categorias.slice(0, 4).map(c => (
                   <div key={c.nombre} className="flex items-center gap-3 text-xs">
                     <span className="w-24 truncate text-gray-600 font-medium flex-shrink-0">{c.nombre}</span>
@@ -436,15 +443,15 @@ export default function BIOverview() {
 
         {financiero && (
           <DomainCard to="/business-intelligence/financiero" titulo="Panorama financiero" sub="Margen bruto · venta neta YTD" span={2}>
-            <div className="grid grid-cols-3 gap-4 items-center h-full">
-              <div className="min-w-0 flex flex-col items-center justify-center">
+            <div className="grid grid-cols-3 gap-4 items-center py-2">
+              <div className="min-w-0 flex flex-col items-center">
                 <SemicircleGauge
                   pct={financiero.margenes.margenBrutoPctMes ?? 0}
                   target={0.35}
                   color={GOLD_RAMP[1]}
-                  size={130}
+                  size={120}
                 />
-                <p className="text-xs text-gray-400 font-semibold -mt-1 whitespace-nowrap">Margen bruto (mes)</p>
+                <p className="text-xs text-gray-400 font-semibold mt-1 whitespace-nowrap">Margen bruto (mes)</p>
               </div>
 
               <div className="min-w-0 text-center border-x border-gray-50 px-3">

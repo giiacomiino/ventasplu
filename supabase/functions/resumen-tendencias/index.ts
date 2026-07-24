@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireProfile } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
 
 // Tendencias multi-mes. Usa BudgetSnapshot histórico tal cual (snapshots
 // congelados por mes) — a diferencia del mes en curso, no se recalcula desde
@@ -7,7 +7,7 @@ import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireP
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireProfile(req)
+  const user = await requireRole(req, ['owner', 'admin'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()

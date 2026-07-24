@@ -26,9 +26,11 @@ export default function AppLayout() {
           <NavLink to="/" end className={linkClass}>
             <BarChart2 size={16} /> Ventas por PLU
           </NavLink>
-          <NavLink to="/business-intelligence" className={linkClass}>
-            <Sparkles size={16} /> Business Intelligence
-          </NavLink>
+          {(profile?.rol === 'owner' || profile?.rol === 'admin') && (
+            <NavLink to="/business-intelligence" className={linkClass}>
+              <Sparkles size={16} /> Business Intelligence
+            </NavLink>
+          )}
           {profile?.rol === 'owner' && (
             <NavLink to="/usuarios" className={linkClass}>
               <Users size={16} /> Gestión de usuarios

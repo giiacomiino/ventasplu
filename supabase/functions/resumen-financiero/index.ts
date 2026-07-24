@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireProfile } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
 
 function diaDelAnio(d: Date) {
   const inicio = Date.UTC(d.getUTCFullYear(), 0, 1)
@@ -22,21 +22,26 @@ function sumaVentas(ventas: any[]) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireProfile(req)
+  const user = await requireRole(req, ['owner', 'admin'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()
+  const body = await req.json().catch(() => ({}))
 
   try {
     const ahora = new Date()
-    const inicioMesActual = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), 1)).toISOString()
+    const anioSel = body.anio ?? ahora.getUTCFullYear()
+    const mes0Sel = (body.mes ?? ahora.getUTCMonth() + 1) - 1
+    const inicioMesSel = new Date(Date.UTC(anioSel, mes0Sel, 1)).toISOString()
+    const finMesSel = new Date(Date.UTC(anioSel, mes0Sel + 1, 0, 23, 59, 59)).toISOString()
 
     const [categoriasData, snapshotsAll, ventasAll, facturasMesCrudas] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Categorías', { constraints: JSON.stringify(conOrg()), limit: '100' }),
       bubbleGetAll(bubbleUrl, bubbleToken, 'BudgetSnapshot', conOrg()),
       bubbleGetAll(bubbleUrl, bubbleToken, 'Venta', conOrg()),
       bubbleGetAll(bubbleUrl, bubbleToken, 'Inventario', conOrg(
-        { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioMesActual },
+        { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioMesSel },
+        { key: 'FechaDeIngreso', constraint_type: 'less than', value: finMesSel },
         { key: 'borrada?', constraint_type: 'equals', value: false },
       )),
     ])
@@ -85,7 +90,7 @@ Deno.serve(async (req) => {
       const tipo = tipoPorNombre.get(f['Categoría']) ?? 'Sin tipo'
       gastoPorTipoMes.set(tipo, (gastoPorTipoMes.get(tipo) ?? 0) + (f.MontoSinIVA || 0))
     }
-    const ventasMes = ventasAll.filter((v: any) => v.DiaDeVenta >= inicioMesActual)
+    const ventasMes = ventasAll.filter((v: any) => v.DiaDeVenta >= inicioMesSel && v.DiaDeVenta <= finMesSel)
     const ventaNetaMes = ventasMes.reduce((s: number, v: any) => s + (v.VentaNeta || 0), 0)
 
     const costoDirectoMes = gastoPorTipoMes.get('Costo Directo') ?? 0
@@ -94,7 +99,7 @@ Deno.serve(async (req) => {
     const margenOperacionMes = margenBrutoMes - gastosOperacionMes
 
     const margenes = {
-      mes: inicioMesActual,
+      mes: inicioMesSel,
       ventaNetaMes,
       margenBrutoMes,
       margenBrutoPctMes: ventaNetaMes ? margenBrutoMes / ventaNetaMes : null,
@@ -121,9 +126,11 @@ Deno.serve(async (req) => {
       margenOperacionPctYTD: ytd.ventaNeta ? margenOperacionYTD / ytd.ventaNeta : null,
     }
 
-    // ── Proyección del mes (VentaProyectada, calculada en Bubble) ──────
-    const mesReciente = snapshotsAll.reduce((max: string, s: any) => (s.MesDeReferencia > max ? s.MesDeReferencia : max), '')
-    const proyeccionVentaNeta = snapshotsAll.find((s: any) => s.MesDeReferencia === mesReciente)?.VentaProyectada ?? null
+    // ── Proyección del mes seleccionado (VentaProyectada, calculada en Bubble) ──
+    const proyeccionVentaNeta = snapshotsAll.find((s: any) => {
+      const d = new Date(s.MesDeReferencia)
+      return d.getUTCFullYear() === anioSel && d.getUTCMonth() === mes0Sel
+    })?.VentaProyectada ?? null
 
     // ── Categorías del mes en curso: monto y % de la venta del mes ─────
     const gastoPorCategoriaMes = new Map<string, number>()
@@ -150,12 +157,29 @@ Deno.serve(async (req) => {
     const ultimosTresMeses = mesesDisponibles.map(mes => {
       const filas = snapshotsAll.filter((s: any) => s.MesDeReferencia === mes)
       const ventaDelMes = ventaPorMes.get((mes as string).slice(0, 7)) ?? 0
+
+      const dMes = new Date(mes as string)
+      const mesAnteriorAnio = `${dMes.getUTCFullYear() - 1}-${String(dMes.getUTCMonth() + 1).padStart(2, '0')}`
+      const gastoAnteriorPorCategoria = new Map<string, number>()
+      for (const s of snapshotsAll) {
+        if ((s.MesDeReferencia as string).slice(0, 7) === mesAnteriorAnio) {
+          const nombre = categoriaPorId.get(s.Categoria)?.nombre ?? 'Sin categoría'
+          gastoAnteriorPorCategoria.set(nombre, (gastoAnteriorPorCategoria.get(nombre) ?? 0) + (s.GastoReal ?? 0))
+        }
+      }
+
       const categorias = filas
-        .map((s: any) => ({
-          nombre: categoriaPorId.get(s.Categoria)?.nombre ?? 'Sin categoría',
-          monto: s.GastoReal ?? 0,
-          pctVenta: ventaDelMes ? (s.GastoReal ?? 0) / ventaDelMes : null,
-        }))
+        .map((s: any) => {
+          const nombre = categoriaPorId.get(s.Categoria)?.nombre ?? 'Sin categoría'
+          const monto = s.GastoReal ?? 0
+          const montoAnterior = gastoAnteriorPorCategoria.get(nombre) ?? null
+          return {
+            nombre,
+            monto,
+            pctVenta: ventaDelMes ? monto / ventaDelMes : null,
+            yoyPct: montoAnterior ? ((monto - montoAnterior) / montoAnterior) * 100 : null,
+          }
+        })
         .sort((a, b) => b.monto - a.monto)
       return { mes, categorias }
     })

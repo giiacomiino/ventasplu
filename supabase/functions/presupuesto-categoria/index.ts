@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireProfile } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
 
 // Rolling forecast por proveedor dentro de una categoría:
 // el límite de la categoría se reparte entre sus proveedores según el %
@@ -8,10 +8,10 @@ import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireP
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireProfile(req)
+  const user = await requireRole(req, ['owner', 'admin'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
-  const { categoria } = await req.json().catch(() => ({}))
+  const { categoria, anio, mes } = await req.json().catch(() => ({}))
   if (!categoria) return json({ error: 'Falta categoría' }, 400)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()
@@ -24,19 +24,26 @@ Deno.serve(async (req) => {
     const cat = categoriasData.response.results.find((c: any) => c.CategoriaNombre === categoria)
     if (!cat) return json({ error: 'Categoría no encontrada' }, 404)
 
+    const hoyReal = new Date()
+    const anioSel = anio ?? hoyReal.getUTCFullYear()
+    const mes0Sel = (mes ?? hoyReal.getUTCMonth() + 1) - 1
+
     const snapshotsData = await bubbleGet(bubbleUrl, bubbleToken, 'BudgetSnapshot', {
       constraints: JSON.stringify(conOrg(
         { key: 'Categoria', constraint_type: 'equals', value: cat._id },
       )),
       sort_field: 'MesDeReferencia',
       descending: 'true',
-      limit: '1',
+      limit: '50',
     })
-    const limiteMes = snapshotsData.response.results[0]?.LimiteMes ?? null
+    const limiteMes = snapshotsData.response.results.find((s: any) => {
+      const d = new Date(s.MesDeReferencia)
+      return d.getUTCFullYear() === anioSel && d.getUTCMonth() === mes0Sel
+    })?.LimiteMes ?? null
 
-    const ahora = new Date()
-    const inicioMesActual = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), 1))
-    const inicioVentana = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth() - 6, 1))
+    const inicioMesActual = new Date(Date.UTC(anioSel, mes0Sel, 1))
+    const finMesActual = new Date(Date.UTC(anioSel, mes0Sel + 1, 0, 23, 59, 59))
+    const inicioVentana = new Date(Date.UTC(anioSel, mes0Sel - 6, 1))
 
     // Dos consultas separadas (no una sola con todo el rango): así el mes en
     // curso siempre llega completo, sin importar qué tan grande sea el
@@ -51,6 +58,7 @@ Deno.serve(async (req) => {
       bubbleGetAll(bubbleUrl, bubbleToken, 'Inventario', conOrg(
         { key: 'Categoría', constraint_type: 'equals', value: categoria },
         { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioMesActual.toISOString() },
+        { key: 'FechaDeIngreso', constraint_type: 'less than', value: finMesActual.toISOString() },
         { key: 'borrada?', constraint_type: 'equals', value: false },
       )),
     ])

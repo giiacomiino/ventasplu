@@ -1,31 +1,58 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, conOrg, isoWeekday, requireProfile } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, conOrg, isoWeekday, requireRole } from '../_shared/bubble.ts'
 
 function sumaVenta(results: any[]) {
   return results.reduce((s, v) => s + (v.VentaNeta || 0), 0)
 }
 
+function limitesMes(anio: number, mes0: number) {
+  return {
+    inicio: new Date(Date.UTC(anio, mes0, 1)).toISOString(),
+    fin: new Date(Date.UTC(anio, mes0 + 1, 0, 23, 59, 59)).toISOString(),
+  }
+}
+
+function limitesTramo(anio: number, mes0: number, diaCorte: number) {
+  return {
+    inicio: new Date(Date.UTC(anio, mes0, 1)).toISOString(),
+    fin: new Date(Date.UTC(anio, mes0, diaCorte, 23, 59, 59)).toISOString(),
+  }
+}
+
+function mesAnterior0(anio: number, mes0: number) {
+  return mes0 === 0 ? { anio: anio - 1, mes0: 11 } : { anio, mes0: mes0 - 1 }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireProfile(req)
+  const user = await requireRole(req, ['owner', 'admin'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()
+  const body = await req.json().catch(() => ({}))
 
   try {
-    const ahora = new Date()
-    const anio = ahora.getUTCFullYear()
-    const mes = ahora.getUTCMonth() // 0-indexed
-    const diaHoy = ahora.getUTCDate()
-    const diasDelMes = new Date(Date.UTC(anio, mes + 1, 0)).getUTCDate()
+    const hoyReal = new Date()
+    // mes seleccionado (1-12 desde el cliente); por default, el mes real en curso
+    const anio = body.anio ?? hoyReal.getUTCFullYear()
+    const mes0 = (body.mes ?? hoyReal.getUTCMonth() + 1) - 1 // 0-indexado internamente
+    const esMesActual = anio === hoyReal.getUTCFullYear() && mes0 === hoyReal.getUTCMonth()
+    const diasDelMes = new Date(Date.UTC(anio, mes0 + 1, 0)).getUTCDate()
+    const diaCorte = esMesActual ? hoyReal.getUTCDate() : diasDelMes
 
-    const inicioMesActual = new Date(Date.UTC(anio, mes, 1)).toISOString()
-    const inicioMesAnterior = new Date(Date.UTC(anio, mes - 1, 1)).toISOString()
-    const finTramoMesAnterior = new Date(Date.UTC(anio, mes - 1, diaHoy, 23, 59, 59)).toISOString()
-    const inicioMismoMesAnioAnterior = new Date(Date.UTC(anio - 1, mes, 1)).toISOString()
-    const finTramoAnioAnterior = new Date(Date.UTC(anio - 1, mes, diaHoy, 23, 59, 59)).toISOString()
+    const { inicio: inicioSel, fin: finSel } = esMesActual
+      ? limitesTramo(anio, mes0, diaCorte)
+      : limitesMes(anio, mes0)
 
-    const [ventaData, promedioData, mtdData, mesAnteriorData, anioAnteriorData] = await Promise.all([
+    const anteriorRef = mesAnterior0(anio, mes0)
+    const { inicio: inicioAnt, fin: finAnt } = esMesActual
+      ? limitesTramo(anteriorRef.anio, anteriorRef.mes0, diaCorte)
+      : limitesMes(anteriorRef.anio, anteriorRef.mes0)
+
+    const { inicio: inicioAnioAntTramo, fin: finAnioAntTramo } = limitesTramo(anio - 1, mes0, diaCorte)
+    const { inicio: inicioAnioAntCompleto, fin: finAnioAntCompleto } = limitesMes(anio - 1, mes0)
+
+    const [ventaData, promedioData, selData, mesAnteriorData, anioAnteriorTramoData, anioAnteriorCompletoData] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
         constraints: JSON.stringify(conOrg()),
         sort_field: 'DiaDeVenta',
@@ -37,20 +64,30 @@ Deno.serve(async (req) => {
         limit: '7',
       }),
       bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
-        constraints: JSON.stringify(conOrg({ key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioMesActual })),
-        limit: '100',
-      }),
-      bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
         constraints: JSON.stringify(conOrg(
-          { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioMesAnterior },
-          { key: 'DiaDeVenta', constraint_type: 'less than', value: finTramoMesAnterior },
+          { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioSel },
+          { key: 'DiaDeVenta', constraint_type: 'less than', value: finSel },
         )),
         limit: '100',
       }),
       bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
         constraints: JSON.stringify(conOrg(
-          { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioMismoMesAnioAnterior },
-          { key: 'DiaDeVenta', constraint_type: 'less than', value: finTramoAnioAnterior },
+          { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioAnt },
+          { key: 'DiaDeVenta', constraint_type: 'less than', value: finAnt },
+        )),
+        limit: '100',
+      }),
+      bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
+        constraints: JSON.stringify(conOrg(
+          { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioAnioAntTramo },
+          { key: 'DiaDeVenta', constraint_type: 'less than', value: finAnioAntTramo },
+        )),
+        limit: '100',
+      }),
+      bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
+        constraints: JSON.stringify(conOrg(
+          { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioAnioAntCompleto },
+          { key: 'DiaDeVenta', constraint_type: 'less than', value: finAnioAntCompleto },
         )),
         limit: '100',
       }),
@@ -63,7 +100,8 @@ Deno.serve(async (req) => {
       promedioData.response.results.map((p: any) => [p.DiaSemana, p.PromedioVenta]),
     )
 
-    // más reciente primero -> lo invertimos para graficar de izquierda (viejo) a derecha (ayer)
+    // "ayer" y los últimos 14 días son siempre lo más reciente real,
+    // independientes del mes seleccionado en el resto de la página
     const tendencia = [...ventas].reverse().map((v: any) => {
       const diaSemana = isoWeekday(v.DiaDeVenta)
       const promedioVenta = promedioPorDia.get(diaSemana) ?? null
@@ -86,35 +124,68 @@ Deno.serve(async (req) => {
       ticketPromedio: ultimo.TicketPromedio,
     }
 
-    // ── Venta MTD + MoM + YoY ──────────────────────────────────────────
-    const ventaNetaMTD = sumaVenta(mtdData.response.results)
-    const ventaNetaMesAnteriorTramo = sumaVenta(mesAnteriorData.response.results)
-    const ventaNetaAnioAnteriorTramo = sumaVenta(anioAnteriorData.response.results)
-    const momPct = ventaNetaMesAnteriorTramo ? ((ventaNetaMTD - ventaNetaMesAnteriorTramo) / ventaNetaMesAnteriorTramo) * 100 : null
-    const yoyPct = ventaNetaAnioAnteriorTramo ? ((ventaNetaMTD - ventaNetaAnioAnteriorTramo) / ventaNetaAnioAnteriorTramo) * 100 : null
+    // ── Venta del mes seleccionado (parcial si es el mes en curso, cerrada si no) ──
+    const ventaNetaSel = sumaVenta(selData.response.results)
+    const ventaNetaMesAnterior = sumaVenta(mesAnteriorData.response.results)
+    const ventaNetaAnioAnteriorTramo = sumaVenta(anioAnteriorTramoData.response.results)
+    const ventaTotalMesAnioAnterior = sumaVenta(anioAnteriorCompletoData.response.results)
 
-    // ── Proyección de cierre de mes ────────────────────────────────────
-    // suma el MTD real + el promedio histórico de cada día de la semana
-    // restante del mes (no una simple regla de tres)
-    let proyeccionRestante = 0
-    for (let d = diaHoy + 1; d <= diasDelMes; d++) {
-      const fecha = new Date(Date.UTC(anio, mes, d))
-      const diaSemana = isoWeekday(fecha.toISOString())
-      proyeccionRestante += promedioPorDia.get(diaSemana) ?? 0
+    const momPct = ventaNetaMesAnterior ? ((ventaNetaSel - ventaNetaMesAnterior) / ventaNetaMesAnterior) * 100 : null
+    // si es el mes en curso, comparamos MTD vs MTD (mismo tramo); si ya cerró, comparamos el total real vs. el total real
+    const yoyBase = esMesActual ? ventaNetaAnioAnteriorTramo : ventaTotalMesAnioAnterior
+    const yoyPct = yoyBase ? ((ventaNetaSel - yoyBase) / yoyBase) * 100 : null
+
+    // ── Proyección de cierre (solo aplica si es el mes en curso) ───────
+    let proyeccionCierreMes = null
+    let proyeccionVsAnioAnteriorPct = null
+    if (esMesActual) {
+      let proyeccionRestante = 0
+      for (let d = diaCorte + 1; d <= diasDelMes; d++) {
+        const fecha = new Date(Date.UTC(anio, mes0, d))
+        const diaSemana = isoWeekday(fecha.toISOString())
+        proyeccionRestante += promedioPorDia.get(diaSemana) ?? 0
+      }
+      proyeccionCierreMes = ventaNetaSel + proyeccionRestante
+      proyeccionVsAnioAnteriorPct = ventaTotalMesAnioAnterior
+        ? ((proyeccionCierreMes - ventaTotalMesAnioAnterior) / ventaTotalMesAnioAnterior) * 100
+        : null
     }
-    const proyeccionCierreMes = ventaNetaMTD + proyeccionRestante
+
+    // ── Promedio real del mes seleccionado por día de la semana ────────
+    const acumPorDia = new Map<number, { suma: number; n: number }>()
+    for (const v of selData.response.results) {
+      const dia = isoWeekday(v.DiaDeVenta)
+      const acc = acumPorDia.get(dia) ?? { suma: 0, n: 0 }
+      acc.suma += v.VentaNeta || 0
+      acc.n += 1
+      acumPorDia.set(dia, acc)
+    }
+    const porDiaSemana = [1, 2, 3, 4, 5, 6, 7].map(dia => {
+      const acc = acumPorDia.get(dia)
+      return {
+        diaSemana: dia,
+        promedioReal: acc ? acc.suma / acc.n : null,
+        promedioHistorico: promedioPorDia.get(dia) ?? null,
+      }
+    })
 
     return json({
       ayer,
       tendencia,
       mtd: {
-        ventaNeta: ventaNetaMTD,
-        diaHoy,
+        anio,
+        mes: mes0 + 1,
+        esMesActual,
+        ventaNeta: ventaNetaSel,
+        diaCorte,
         diasDelMes,
         momPct,
         yoyPct,
         proyeccionCierreMes,
+        ventaTotalMesAnioAnterior,
+        proyeccionVsAnioAnteriorPct,
       },
+      porDiaSemana,
     })
   } catch (e) {
     return json({ error: e.message }, 502)

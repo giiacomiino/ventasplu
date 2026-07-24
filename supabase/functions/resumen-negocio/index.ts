@@ -1,25 +1,28 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireProfile } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireProfile(req)
+  const user = await requireRole(req, ['owner', 'admin'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()
+  const body = await req.json().catch(() => ({}))
 
   try {
-    // ── Categorías + límite de presupuesto (LimiteMes viene del último
-    //    BudgetSnapshot cerrado — la fórmula de límite vive en Bubble y no
-    //    la replicamos aquí; solo GastoReal se recalcula en vivo abajo). ──
-    const ahora = new Date()
-    const inicioMesActual = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), 1)).toISOString()
-    const hace30dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-    // una sola ventana (la más amplia de las dos) para no pedirle a Bubble
-    // el mismo rango de facturas dos veces
-    const inicioVentana = inicioMesActual < hace30dias ? inicioMesActual : hace30dias
+    // ── Categorías + límite de presupuesto del mes seleccionado (LimiteMes
+    //    viene de BudgetSnapshot — la fórmula vive en Bubble y no la
+    //    replicamos aquí; solo GastoReal se recalcula en vivo abajo). ──
+    const hoyReal = new Date()
+    const anio = body.anio ?? hoyReal.getUTCFullYear()
+    const mes0 = (body.mes ?? hoyReal.getUTCMonth() + 1) - 1
+    const esMesActual = anio === hoyReal.getUTCFullYear() && mes0 === hoyReal.getUTCMonth()
 
-    const [categoriasData, snapshotsData, facturasCrudas] = await Promise.all([
+    const inicioMesSel = new Date(Date.UTC(anio, mes0, 1)).toISOString()
+    const finMesSel = new Date(Date.UTC(anio, mes0 + 1, 0, 23, 59, 59)).toISOString()
+    const hace30dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    const [categoriasData, snapshotsData, facturasMesCrudas, facturas30Crudas] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Categorías', {
         constraints: JSON.stringify(conOrg()),
         limit: '100',
@@ -31,7 +34,12 @@ Deno.serve(async (req) => {
         limit: '50',
       }),
       bubbleGetAll(bubbleUrl, bubbleToken, 'Inventario', conOrg(
-        { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioVentana },
+        { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioMesSel },
+        { key: 'FechaDeIngreso', constraint_type: 'less than', value: finMesSel },
+        { key: 'borrada?', constraint_type: 'equals', value: false },
+      )),
+      bubbleGetAll(bubbleUrl, bubbleToken, 'Inventario', conOrg(
+        { key: 'FechaDeIngreso', constraint_type: 'greater than', value: hace30dias },
         { key: 'borrada?', constraint_type: 'equals', value: false },
       )),
     ])
@@ -40,10 +48,13 @@ Deno.serve(async (req) => {
       categoriasData.response.results.map((c: any) => [c._id, { nombre: c.CategoriaNombre, tipo: c.TipoDeCosto }]),
     )
 
+    // BudgetSnapshot.MesDeReferencia del mes seleccionado (exacto, no "el más reciente")
     const snapshots = snapshotsData.response.results
-    const mesReciente = snapshots[0]?.MesDeReferencia
     const limitesDelMes = snapshots
-      .filter((s: any) => s.MesDeReferencia === mesReciente)
+      .filter((s: any) => {
+        const d = new Date(s.MesDeReferencia)
+        return d.getUTCFullYear() === anio && d.getUTCMonth() === mes0
+      })
       .map((s: any) => ({
         nombre: categoriaPorId.get(s.Categoria)?.nombre ?? 'Sin categoría',
         tipo: categoriaPorId.get(s.Categoria)?.tipo ?? null,
@@ -52,9 +63,8 @@ Deno.serve(async (req) => {
 
     // no confiamos en BudgetSnapshot.GastoReal: es un snapshot congelado
     // y puede incluir facturas que después se marcaron como borradas
-    const facturasVentana = facturasCrudas.filter((f: any) => f['borrada?'] !== true)
-    const facturasMes = facturasVentana.filter((f: any) => f.FechaDeIngreso >= inicioMesActual)
-    const facturas30 = facturasVentana.filter((f: any) => f.FechaDeIngreso >= hace30dias)
+    const facturasMes = facturasMesCrudas.filter((f: any) => f['borrada?'] !== true)
+    const facturas30 = facturas30Crudas.filter((f: any) => f['borrada?'] !== true)
 
     const gastoRealPorCategoria = new Map<string, number>()
     for (const f of facturasMes) {
@@ -62,15 +72,15 @@ Deno.serve(async (req) => {
       gastoRealPorCategoria.set(cat, (gastoRealPorCategoria.get(cat) ?? 0) + (f.MontoSinIVA || 0))
     }
 
-    const diasTranscurridos = ahora.getUTCDate()
-    const diasDelMes = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth() + 1, 0)).getUTCDate()
+    const diasDelMes = new Date(Date.UTC(anio, mes0 + 1, 0)).getUTCDate()
+    const diasTranscurridos = esMesActual ? hoyReal.getUTCDate() : diasDelMes
     const ritmoIdeal = diasTranscurridos / diasDelMes
 
     const categorias = limitesDelMes.map((c: any) => {
       const gastoReal = gastoRealPorCategoria.get(c.nombre) ?? 0
       const porcentajeUtilizado = c.limiteMes ? gastoReal / c.limiteMes : null
       // a este ritmo diario promedio, ¿qué día del mes se agotaría el límite?
-      const diaAgotamientoProyectado = gastoReal > 0 && c.limiteMes
+      const diaAgotamientoProyectado = esMesActual && gastoReal > 0 && c.limiteMes
         ? Math.round(diasTranscurridos * (c.limiteMes / gastoReal))
         : null
       return {
@@ -104,7 +114,7 @@ Deno.serve(async (req) => {
       : null
 
     return json({
-      presupuesto: { mes: inicioMesActual, categorias, totalGastoReal, totalLimite, diasTranscurridos, diasDelMes, ritmoIdeal },
+      presupuesto: { mes: inicioMesSel, esMesActual, categorias, totalGastoReal, totalLimite, diasTranscurridos, diasDelMes, ritmoIdeal },
       proveedores: {
         desde: hace30dias,
         top: topProveedores,

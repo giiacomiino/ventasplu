@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { llamar, estadoPresupuesto, GOLD_RAMP, CRITICAL } from './shared'
 import { Card, SectionHeader, PageHeader, MiniBar, LoadingState, ErrorState } from './ui'
+import { useMesSeleccionado, SelectorMes } from './mesContext'
 
 function iconoPresupuesto(pct) {
   if (pct == null) return CheckCircle2
@@ -79,7 +80,7 @@ function FacturasProveedor({ facturas }) {
   )
 }
 
-function ProveedorRolling({ p, categoria }) {
+function ProveedorRolling({ p, categoria, anio, mes }) {
   const [abierto, setAbierto] = useState(false)
   const [detalle, setDetalle] = useState(null)
   const [cargando, setCargando] = useState(false)
@@ -91,7 +92,7 @@ function ProveedorRolling({ p, categoria }) {
     if (!abierto && !detalle) {
       setCargando(true)
       try {
-        const d = await llamar('presupuesto-proveedor', { categoria, proveedor: p.nombre })
+        const d = await llamar('presupuesto-proveedor', { categoria, proveedor: p.nombre, anio, mes })
         setDetalle(d)
       } catch (e) {
         setError(e.message)
@@ -140,7 +141,7 @@ function ProveedorRolling({ p, categoria }) {
   )
 }
 
-function CategoriaRow({ c }) {
+function CategoriaRow({ c, anio, mes }) {
   const [abierto, setAbierto] = useState(false)
   const [detalle, setDetalle] = useState(null)
   const [cargando, setCargando] = useState(false)
@@ -152,7 +153,7 @@ function CategoriaRow({ c }) {
     if (!abierto && !detalle) {
       setCargando(true)
       try {
-        const d = await llamar('presupuesto-categoria', { categoria: c.nombre })
+        const d = await llamar('presupuesto-categoria', { categoria: c.nombre, anio, mes })
         setDetalle(d)
       } catch (e) {
         setError(e.message)
@@ -194,7 +195,9 @@ function CategoriaRow({ c }) {
                 {detalle.proveedores.length === 0 ? (
                   <p className="text-xs text-gray-300 py-3">Sin proveedores en el periodo</p>
                 ) : (
-                  detalle.proveedores.map(p => <ProveedorRolling key={p.nombre} p={p} categoria={c.nombre} />)
+                  detalle.proveedores.map(p => (
+                    <ProveedorRolling key={p.nombre} p={p} categoria={c.nombre} anio={anio} mes={mes} />
+                  ))
                 )}
               </div>
             </>
@@ -225,19 +228,21 @@ function Sparkline({ serie }) {
 }
 
 export default function BIPresupuesto() {
+  const { anio, mes } = useMesSeleccionado()
   const [negocio, setNegocio] = useState(null)
   const [tendencias, setTendencias] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.allSettled([llamar('resumen-negocio'), llamar('resumen-tendencias')]).then(([r1, r2]) => {
+    setLoading(true)
+    Promise.allSettled([llamar('resumen-negocio', { anio, mes }), llamar('resumen-tendencias')]).then(([r1, r2]) => {
       if (r1.status === 'fulfilled') setNegocio(r1.value)
       if (r2.status === 'fulfilled') setTendencias(r2.value)
       setError(r1.status === 'rejected' ? r1.reason.message : r2.status === 'rejected' ? r2.reason.message : '')
       setLoading(false)
     })
-  }, [])
+  }, [anio, mes])
 
   return (
     <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
@@ -245,7 +250,7 @@ export default function BIPresupuesto() {
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
         </Link>
-        <PageHeader title="Presupuesto" sub="Control de gasto vs. límite mensual, por categoría y proveedor" />
+        <PageHeader title="Presupuesto" sub="Control de gasto vs. límite mensual, por categoría y proveedor" right={<SelectorMes />} />
       </div>
 
       {loading && <LoadingState>Cargando...</LoadingState>}
@@ -269,7 +274,9 @@ export default function BIPresupuesto() {
                 />
               </div>
               <div className="px-6 pb-2">
-                {negocio.presupuesto.categorias.map(c => <CategoriaRow key={c.nombre} c={c} />)}
+                {negocio.presupuesto.categorias.map(c => (
+                  <CategoriaRow key={`${c.nombre}-${anio}-${mes}`} c={c} anio={anio} mes={mes} />
+                ))}
               </div>
             </Card>
           </div>
