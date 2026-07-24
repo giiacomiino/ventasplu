@@ -5,8 +5,21 @@ import { formatMoney } from '../../utils/formatters'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { llamar, estadoPresupuesto, GOLD_RAMP, CRITICAL } from './shared'
-import { Card, SectionHeader, PageHeader, MiniBar, LoadingState, ErrorState } from './ui'
+import { Card, SectionHeader, PageHeader, MiniBar, DeltaPill, LoadingState, ErrorState } from './ui'
 import { useMesSeleccionado, SelectorMes } from './mesContext'
+
+function formatK(n) {
+  if (n == null) return '—'
+  return `$${(n / 1000).toFixed(0)}k`
+}
+
+function Tooltip({ children }) {
+  return (
+    <div className="absolute -top-2 -translate-y-full z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg pointer-events-none left-1/2 -translate-x-1/2">
+      {children}
+    </div>
+  )
+}
 
 function iconoPresupuesto(pct) {
   if (pct == null) return CheckCircle2
@@ -27,29 +40,69 @@ function EstadoBadge({ pct, size = 12 }) {
 }
 
 function GraficaProveedor({ serieMensual, impliedBudget }) {
-  const max = Math.max(...serieMensual.map(s => s.monto), impliedBudget || 0, 1)
+  const [hover, setHover] = useState(null)
+  // headroom del 12% para que la barra más alta no toque el borde del área
+  const max = Math.max(...serieMensual.map(s => s.monto), impliedBudget || 0, 1) * 1.12
   const alturaLinea = impliedBudget ? Math.min((impliedBudget / max) * 100, 100) : null
+
   return (
-    <div className="relative flex items-end gap-2.5 h-32 pt-5">
-      {alturaLinea != null && (
-        <div
-          className="absolute left-0 right-0 border-t-2 border-dashed flex items-center z-10"
-          style={{ bottom: `${alturaLinea}%`, borderColor: CRITICAL }}
-        >
-          <span className="absolute -top-4 left-0 text-[10px] font-bold whitespace-nowrap" style={{ color: CRITICAL }}>
-            implícito {formatMoney(impliedBudget)}
-          </span>
-        </div>
-      )}
-      {serieMensual.map(s => (
-        <div key={s.mes} className="flex-1 h-full flex flex-col justify-end items-center">
+    <div>
+      <div className="flex gap-2.5 mb-2">
+        {serieMensual.map((s, i) => {
+          const yoyPct = s.montoAnterior ? ((s.monto - s.montoAnterior) / s.montoAnterior) * 100 : null
+          return (
+            <div key={i} className="flex-1 flex justify-center">
+              {yoyPct != null && <DeltaPill pct={yoyPct} invert compact suffix=" YoY" />}
+            </div>
+          )
+        })}
+      </div>
+      <div className="relative flex items-end gap-2.5 h-32">
+        {alturaLinea != null && (
           <div
-            className="w-full rounded-t-md"
-            style={{ height: `${Math.max((s.monto / max) * 100, s.monto ? 3 : 0)}%`, background: GOLD_RAMP[1] }}
-          />
-          <span className="text-[10px] text-gray-400 mt-1.5 font-medium">{s.mes.slice(5)}</span>
-        </div>
-      ))}
+            className="absolute left-0 right-0 border-t-2 border-dashed z-10"
+            style={{ bottom: `${alturaLinea}%`, borderColor: CRITICAL }}
+          >
+            <span className="absolute -top-4 left-0 text-[10px] font-bold whitespace-nowrap bg-white pr-1" style={{ color: CRITICAL }}>
+              implícito {formatMoney(impliedBudget)}
+            </span>
+          </div>
+        )}
+        {serieMensual.map((s, i) => {
+          const h = Math.max((s.monto / max) * 100, s.monto ? 10 : 0)
+          return (
+            <div
+              key={s.mes}
+              className="flex-1 h-full flex flex-col justify-end items-center relative cursor-pointer"
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+            >
+              {hover === i && (
+                <Tooltip>
+                  <p className="font-semibold capitalize">{format(new Date(`${s.mes}-01T00:00:00`), 'MMMM yyyy', { locale: es })}</p>
+                  <p className="text-gray-300">{formatMoney(s.monto)}</p>
+                  {s.montoAnterior > 0 && <p className="text-gray-400">Año anterior: {formatMoney(s.montoAnterior)}</p>}
+                </Tooltip>
+              )}
+              <div
+                className="w-full rounded-t-md relative transition-opacity"
+                style={{ height: `${h}%`, background: GOLD_RAMP[1], opacity: hover === i ? 0.75 : 1 }}
+              >
+                {s.monto > 0 && (
+                  <span className="absolute top-1/2 left-0 right-0 -translate-y-1/2 text-center text-[10px] font-bold text-white whitespace-nowrap">
+                    {formatK(s.monto)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex gap-2.5 mt-1.5">
+        {serieMensual.map(s => (
+          <div key={s.mes} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{s.mes.slice(5)}</div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -85,8 +138,11 @@ function ProveedorRolling({ p }) {
   const { color } = estadoPresupuesto(p.pct)
 
   return (
-    <div>
-      <button onClick={() => setAbierto(a => !a)} className="w-full text-left py-3 px-3 -mx-3 rounded-lg hover:bg-gray-50 transition-colors">
+    <div className={`rounded-lg border bg-white transition-colors ${abierto ? 'border-gray-200 shadow-sm' : 'border-gray-100'}`}>
+      <button
+        onClick={() => setAbierto(a => !a)}
+        className="w-full text-left p-3 rounded-lg hover:bg-gray-50/80 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
+      >
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={13} className="text-gray-300 flex-shrink-0" /> : <ChevronDown size={13} className="text-gray-300 flex-shrink-0" />}
@@ -104,8 +160,8 @@ function ProveedorRolling({ p }) {
       </button>
 
       {abierto && (
-        <div className="ml-5 mb-3 pl-4 border-l-2 border-gray-100">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 mt-2">
+        <div className="px-4 pb-4 pt-3 mt-1 border-t border-gray-100">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
             Últimos 6 meses vs. presupuesto implícito
           </p>
           <GraficaProveedor serieMensual={p.serieMensual} impliedBudget={p.impliedBudget} />
@@ -123,7 +179,10 @@ function CategoriaRow({ c, detalle, cargandoArbol }) {
 
   return (
     <div className="border-b border-gray-50 last:border-0">
-      <button onClick={() => setAbierto(a => !a)} className="w-full text-left py-4 hover:bg-gray-50/60 transition-colors px-1">
+      <button
+        onClick={() => setAbierto(a => !a)}
+        className="w-full text-left py-4 hover:bg-gray-50/60 transition-colors px-1 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
+      >
         <div className="flex items-center justify-between gap-3 mb-2.5">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={15} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />}
@@ -141,14 +200,14 @@ function CategoriaRow({ c, detalle, cargandoArbol }) {
       </button>
 
       {abierto && (
-        <div className="ml-6 mb-4 pl-4 border-l-2 border-gray-100">
+        <div className="ml-6 mr-1 mb-4 p-3 rounded-xl bg-gray-50/70">
           {cargandoArbol && !detalle && <LoadingState>Cargando proveedores...</LoadingState>}
           {detalle && (
             <>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 mt-2">
-                Presupuesto repartido según el % histórico de cada proveedor (últimos 6 meses)
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
+                Proveedores de esta categoría · reparto según su % histórico (últimos 6 meses)
               </p>
-              <div>
+              <div className="space-y-2">
                 {detalle.proveedores.length === 0 ? (
                   <p className="text-xs text-gray-300 py-3">Sin proveedores en el periodo</p>
                 ) : (

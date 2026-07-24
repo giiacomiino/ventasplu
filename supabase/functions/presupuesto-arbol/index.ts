@@ -24,8 +24,12 @@ Deno.serve(async (req) => {
     const inicioMesSel = new Date(Date.UTC(anioSel, mes0Sel, 1))
     const finMesSel = new Date(Date.UTC(anioSel, mes0Sel + 1, 0, 23, 59, 59))
     const inicioVentana = new Date(Date.UTC(anioSel, mes0Sel - 6, 1))
+    // mismo rango de 6 meses pero un año antes, para poder mostrar la
+    // variación YoY de cada barra del gráfico de proveedor.
+    const inicioVentanaAnyoAnt = new Date(Date.UTC(anioSel - 1, mes0Sel - 6, 1))
+    const finVentanaAnyoAnt = new Date(Date.UTC(anioSel - 1, mes0Sel + 1, 0, 23, 59, 59))
 
-    const [categoriasData, snapshotsData, historicasCrudas, delMesCrudas] = await Promise.all([
+    const [categoriasData, snapshotsData, historicasCrudas, delMesCrudas, anyoAnteriorCrudas] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Categorías', { constraints: JSON.stringify(conOrg()), limit: '100' }),
       bubbleGet(bubbleUrl, bubbleToken, 'BudgetSnapshot', {
         constraints: JSON.stringify(conOrg()),
@@ -41,6 +45,11 @@ Deno.serve(async (req) => {
       bubbleGetAllFast(bubbleUrl, bubbleToken, 'Inventario', conOrg(
         { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioMesSel.toISOString() },
         { key: 'FechaDeIngreso', constraint_type: 'less than', value: finMesSel.toISOString() },
+        { key: 'borrada?', constraint_type: 'equals', value: false },
+      )),
+      bubbleGetAllFast(bubbleUrl, bubbleToken, 'Inventario', conOrg(
+        { key: 'FechaDeIngreso', constraint_type: 'greater than', value: inicioVentanaAnyoAnt.toISOString() },
+        { key: 'FechaDeIngreso', constraint_type: 'less than', value: finVentanaAnyoAnt.toISOString() },
         { key: 'borrada?', constraint_type: 'equals', value: false },
       )),
     ])
@@ -63,6 +72,7 @@ Deno.serve(async (req) => {
 
     const historicas = historicasCrudas.filter((f: any) => f['borrada?'] !== true)
     const delMes = delMesCrudas.filter((f: any) => f['borrada?'] !== true)
+    const anyoAnterior = anyoAnteriorCrudas.filter((f: any) => f['borrada?'] !== true)
 
     const clave = (cat: string, prov: string) => `${cat}||${prov}`
 
@@ -116,6 +126,19 @@ Deno.serve(async (req) => {
       serieMensualPorCategoriaProveedor.set(key, mapa)
     }
 
+    // Mismo cálculo pero un año antes, solo para poder comparar mes a mes
+    // (YoY) en el gráfico de cada proveedor.
+    const serieMensualAnyoAntPorCategoriaProveedor = new Map<string, Map<string, number>>()
+    for (const f of anyoAnterior) {
+      const cat = f['Categoría'] || 'Sin categoría'
+      const prov = f.Prooveedor || 'Sin proveedor'
+      const key = clave(cat, prov)
+      const mesKey = (f.FechaDeIngreso as string).slice(0, 7)
+      const mapa = serieMensualAnyoAntPorCategoriaProveedor.get(key) ?? new Map<string, number>()
+      mapa.set(mesKey, (mapa.get(mesKey) ?? 0) + (f.MontoSinIVA || 0))
+      serieMensualAnyoAntPorCategoriaProveedor.set(key, mapa)
+    }
+
     const nombresCategorias = new Set([
       ...limitePorCategoria.keys(),
       ...histTotalPorCategoria.keys(),
@@ -140,11 +163,18 @@ Deno.serve(async (req) => {
         const gastoActual = gastoPorCategoriaProveedor.get(key) ?? 0
 
         const mapaMeses = serieMensualPorCategoriaProveedor.get(key) ?? new Map<string, number>()
+        const mapaMesesAnyoAnt = serieMensualAnyoAntPorCategoriaProveedor.get(key) ?? new Map<string, number>()
         const serieMensual = []
         for (let i = 5; i >= 0; i--) {
           const d = new Date(Date.UTC(anioSel, mes0Sel - i, 1))
           const mesKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-          serieMensual.push({ mes: mesKey, monto: mapaMeses.get(mesKey) ?? 0 })
+          const dAnt = new Date(Date.UTC(anioSel - 1, mes0Sel - i, 1))
+          const mesKeyAnt = `${dAnt.getUTCFullYear()}-${String(dAnt.getUTCMonth() + 1).padStart(2, '0')}`
+          serieMensual.push({
+            mes: mesKey,
+            monto: mapaMeses.get(mesKey) ?? 0,
+            montoAnterior: mapaMesesAnyoAnt.get(mesKeyAnt) ?? 0,
+          })
         }
 
         const facturas = (facturasPorCategoriaProveedor.get(key) ?? [])
