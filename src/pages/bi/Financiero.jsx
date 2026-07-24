@@ -5,7 +5,7 @@ import { formatMoney } from '../../utils/formatters'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { llamar, GOOD, WARNING, CRITICAL, GOLD_RAMP } from './shared'
-import { Card, SectionHeader, PageHeader, KpiTile, DeltaPill, MiniBar, DonutGauge, LoadingState, ErrorState, EmptyState, Thead } from './ui'
+import { Card, SectionHeader, PageHeader, KpiTile, DeltaPill, MiniBar, DonutGauge, LoadingState, ErrorState, EmptyState } from './ui'
 import { useMesSeleccionado, SelectorMes } from './mesContext'
 
 function estadoMargen(pct) {
@@ -49,20 +49,15 @@ function FilaCategoria({ c, max }) {
   )
 }
 
-function FilaMes({ c, max }) {
+function FilaMes({ c, esTop }) {
   return (
-    <tr className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
-      <td className="py-2.5 text-gray-700 font-medium truncate max-w-[1px] w-full">{c.nombre}</td>
+    <tr className={`border-b border-gray-50 last:border-0 transition-colors ${esTop ? 'bg-gold-50/70' : 'hover:bg-gray-50/60'}`}>
+      <td className="py-2.5 pl-3 text-gray-700 font-medium truncate max-w-[1px] w-full">{c.nombre}</td>
       <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums whitespace-nowrap">{formatMoney(c.monto)}</td>
       <td className="py-2.5 text-right whitespace-nowrap">
-        <div className="flex items-center justify-end gap-2">
-          <MiniBar pct={max ? c.monto / max : 0} color={GOLD_RAMP[1]} />
-          <span className="text-gray-400 tabular-nums w-10 text-right">
-            {c.pctVenta != null ? `${(c.pctVenta * 100).toFixed(1)}%` : '—'}
-          </span>
-        </div>
+        <span className="text-gray-500 tabular-nums">{c.pctVenta != null ? `${(c.pctVenta * 100).toFixed(1)}%` : '—'}</span>
       </td>
-      <td className="py-2.5 text-right whitespace-nowrap">
+      <td className="py-2.5 pr-3 text-right whitespace-nowrap">
         {c.yoyPct != null ? <DeltaPill pct={c.yoyPct} invert compact /> : <span className="text-gray-300 text-xs">—</span>}
       </td>
     </tr>
@@ -73,27 +68,33 @@ function MesColumna({ mes, categorias }) {
   const top = categorias.slice(0, 6)
   const resto = categorias.slice(6)
   const restoMonto = resto.reduce((s, c) => s + c.monto, 0)
-  const max = categorias[0]?.monto
   return (
-    <div className="px-6 first:pl-0 last:pr-0">
-      <p className="text-sm font-bold text-gray-800 mb-3 capitalize">
+    <Card>
+      <p className="text-sm font-bold text-gray-800 mb-4 text-center capitalize">
         {format(new Date(mes), 'MMMM yyyy', { locale: es })}
       </p>
       <table className="w-full text-sm border-collapse">
-        <Thead columns={['Categoría', 'Monto', '% venta', 'YoY']} />
+        <thead>
+          <tr className="border-b-2 border-gray-100">
+            <th className="text-left pb-2 pl-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Categoría</th>
+            <th className="text-right pb-2 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Monto</th>
+            <th className="text-right pb-2 text-[11px] font-bold text-gray-400 uppercase tracking-wider">% venta</th>
+            <th className="text-right pb-2 pr-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">YoY</th>
+          </tr>
+        </thead>
         <tbody>
-          {top.map(c => <FilaMes key={c.nombre} c={c} max={max} />)}
+          {top.map((c, i) => <FilaMes key={c.nombre} c={c} esTop={i === 0} />)}
           {resto.length > 0 && (
             <tr>
-              <td className="pt-2.5 text-gray-400 text-xs">+{resto.length} categorías menores</td>
-              <td className="pt-2.5 text-right text-gray-400 font-semibold tabular-nums text-xs">{formatMoney(restoMonto)}</td>
-              <td className="pt-2.5" />
-              <td className="pt-2.5" />
+              <td className="pt-3 pl-3 text-gray-400 text-xs">+{resto.length} categorías menores</td>
+              <td className="pt-3 text-right text-gray-400 font-semibold tabular-nums text-xs">{formatMoney(restoMonto)}</td>
+              <td className="pt-3" />
+              <td className="pt-3 pr-3" />
             </tr>
           )}
         </tbody>
       </table>
-    </div>
+    </Card>
   )
 }
 
@@ -219,12 +220,10 @@ export default function BIFinanciero() {
           </section>
 
           <section>
-            <Card>
-              <SectionHeader title="Últimos 3 meses por categoría" sub="Monto y % de la venta neta de cada mes · histórico de BudgetSnapshot" />
-              <div className="grid grid-cols-3 divide-x divide-gray-100">
-                {data.ultimosTresMeses.map(m => <MesColumna key={m.mes} mes={m.mes} categorias={m.categorias} />)}
-              </div>
-            </Card>
+            <SectionHeader title="Últimos 3 meses por categoría" sub="Monto, % de la venta neta y variación YoY de cada mes · histórico de BudgetSnapshot" />
+            <div className="grid grid-cols-3 gap-6">
+              {data.ultimosTresMeses.map(m => <MesColumna key={m.mes} mes={m.mes} categorias={m.categorias} />)}
+            </div>
           </section>
         </>
       )}
