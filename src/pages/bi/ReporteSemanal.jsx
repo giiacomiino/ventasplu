@@ -6,7 +6,7 @@ import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { supabase } from '../../lib/supabase'
 import { llamar, DIAS, GOLD_RAMP, GOOD, CRITICAL } from './shared'
-import { Card, SectionHeader, PageHeader, KpiTile, DeltaPill, Table, Thead, LoadingState, ErrorState, EmptyState } from './ui'
+import { Card, SectionHeader, PageHeader, KpiTile, DeltaPill, MiniBar, Table, Thead, LoadingState, ErrorState, EmptyState } from './ui'
 import { useSemanaSeleccionada } from './useSemanaSeleccionada'
 
 const DIAS_CORTOS = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -181,9 +181,9 @@ export default function BIReporteSemanal() {
       const finComparacionAntStr = format(addDays(addDays(semana.lunes, -7), diasIncluidos - 1), 'yyyy-MM-dd')
 
       const [actual, anterior] = await Promise.all([
-        supabase.from('ventas_plu').select('monto, producto_id, productos(nombre, categoria, subcategoria)')
+        supabase.from('ventas_plu').select('monto, unidades, producto_id, productos(nombre, categoria, subcategoria)')
           .gte('fecha', semana.lunesStr).lte('fecha', finComparacionStr),
-        supabase.from('ventas_plu').select('monto, producto_id, productos(nombre, categoria, subcategoria)')
+        supabase.from('ventas_plu').select('monto, unidades, producto_id, productos(nombre, categoria, subcategoria)')
           .gte('fecha', lunesAntStr).lte('fecha', finComparacionAntStr),
       ])
 
@@ -193,8 +193,9 @@ export default function BIReporteSemanal() {
           if (!r.productos) continue
           const clave = campo === 'producto' ? r.producto_id : r.productos[campo]
           if (!clave) continue
-          const actual = m.get(clave) ?? { monto: 0, nombre: campo === 'producto' ? r.productos.nombre : clave, categoria: r.productos.categoria }
+          const actual = m.get(clave) ?? { monto: 0, unidades: 0, nombre: campo === 'producto' ? r.productos.nombre : clave, categoria: r.productos.categoria }
           actual.monto += Number(r.monto || 0)
+          actual.unidades += Number(r.unidades || 0)
           m.set(clave, actual)
         }
         return m
@@ -205,9 +206,11 @@ export default function BIReporteSemanal() {
       const nombresSubcat = new Set([...subcatActual.keys(), ...subcatAnterior.keys()])
       const subcategorias = [...nombresSubcat].map(nombre => {
         const monto = subcatActual.get(nombre)?.monto ?? 0
+        const unidades = subcatActual.get(nombre)?.unidades ?? 0
         const anteriorMonto = subcatAnterior.get(nombre)?.monto ?? 0
+        const anteriorUnidades = subcatAnterior.get(nombre)?.unidades ?? 0
         const variacionPct = anteriorMonto ? ((monto - anteriorMonto) / anteriorMonto) * 100 : null
-        return { nombre, monto, anteriorMonto, variacionPct }
+        return { nombre, monto, unidades, anteriorMonto, anteriorUnidades, variacionPct }
       }).sort((a, b) => b.monto - a.monto)
 
       const prodActual = agruparPor(actual.data, 'producto')
@@ -350,8 +353,12 @@ export default function BIReporteSemanal() {
                         {plu.subcategorias.map(c => (
                           <tr key={c.nombre} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
                             <td className="py-2.5 text-gray-700 font-medium">{c.nombre}</td>
-                            <td className="py-2.5 text-right text-gray-400 tabular-nums">{formatMoney(c.anteriorMonto)}</td>
-                            <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">{formatMoney(c.monto)}</td>
+                            <td className="py-2.5 text-right text-gray-400 tabular-nums">
+                              {formatMoney(c.anteriorMonto)} <span className="text-gray-300">· {c.anteriorUnidades.toLocaleString('es-MX')} u.</span>
+                            </td>
+                            <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">
+                              {formatMoney(c.monto)} <span className="text-gray-400 font-normal">· {c.unidades.toLocaleString('es-MX')} u.</span>
+                            </td>
                             <td className="py-2.5 text-right">
                               {c.variacionPct != null ? <DeltaPill pct={c.variacionPct} compact /> : <span className="text-gray-300 text-xs">—</span>}
                             </td>
@@ -418,25 +425,26 @@ export default function BIReporteSemanal() {
 
           <Card padded={false} className="print-card">
             <div className="p-6 pb-0">
-              <SectionHeader title="Gasto por categoría" sub="Esta semana vs. el promedio de las últimas 8 semanas" />
+              <SectionHeader title="Gasto por categoría" sub="Gastos de la semana agrupados por categoría" />
             </div>
             <div className="px-6 pb-2">
               {reporte.gastos.categorias.length === 0 ? (
                 <EmptyState>Sin gasto registrado esta semana</EmptyState>
               ) : (
                 <Table>
-                  <Thead columns={['Categoría', 'Promedio semanal', 'Esta semana', 'Variación']} />
+                  <Thead columns={['Categoría', 'Monto']} />
                   <tbody>
-                    {reporte.gastos.categorias.map(c => (
+                    {[...reporte.gastos.categorias].sort((a, b) => b.gastoSemana - a.gastoSemana).map(c => (
                       <tr key={c.nombre} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
                         <td className="py-2.5 text-gray-700 font-medium">
                           {c.nombre}
                           {c.tipo && <span className="text-xs text-gray-400 font-medium ml-2">{c.tipo}</span>}
                         </td>
-                        <td className="py-2.5 text-right text-gray-400 tabular-nums">{formatMoney(c.promedioSemanal)}</td>
-                        <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">{formatMoney(c.gastoSemana)}</td>
                         <td className="py-2.5 text-right">
-                          {c.variacionPct != null ? <DeltaPill pct={c.variacionPct} invert compact /> : <span className="text-gray-300 text-xs">—</span>}
+                          <div className="flex items-center justify-end gap-2">
+                            <MiniBar pct={reporte.gastos.gastoTotalSemana ? c.gastoSemana / reporte.gastos.gastoTotalSemana : 0} color={GOLD_RAMP[1]} />
+                            <span className="font-semibold text-gray-800 tabular-nums w-24">{formatMoney(c.gastoSemana)}</span>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -537,24 +545,32 @@ export default function BIReporteSemanal() {
 
       {reporte && (
         <div className="hidden print:block text-sm">
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-5 gap-2.5 mb-3">
             <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
               <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Venta de la semana</p>
               <p className="text-base font-bold text-gray-900 truncate">{formatMoney(reporte.ventas.ventaSemana)}</p>
-              <p className="text-[9px] font-semibold" style={{ color: reporte.ventas.ventaSemanaVsPromedioMonto >= 0 ? GOOD : CRITICAL }}>
+              <p className="text-[9px] font-semibold truncate" style={{ color: reporte.ventas.ventaSemanaVsPromedioMonto >= 0 ? GOOD : CRITICAL }}>
                 {reporte.ventas.ventaSemanaVsPromedioMonto >= 0 ? '+' : ''}{formatMoney(reporte.ventas.ventaSemanaVsPromedioMonto)} vs. prom.
               </p>
             </div>
             <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Gasto de la semana</p>
-              <p className="text-base font-bold text-gray-900 truncate">{formatMoney(reporte.gastos.gastoTotalSemana)}</p>
-              <p className="text-[9px] text-gray-400">{reporte.ventas.personas.toLocaleString('es-MX')} personas atendidas</p>
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Ticket promedio</p>
+              <p className="text-base font-bold text-gray-900 truncate">{formatMoney(reporte.ventas.ticketPromedio)}</p>
+              <p className="text-[9px] text-gray-400 truncate">{reporte.ventas.personas.toLocaleString('es-MX')} personas</p>
             </div>
             <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Margen operación proy. ({mesLabel})</p>
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Gasto de la semana</p>
+              <p className="text-base font-bold text-gray-900 truncate">{formatMoney(reporte.gastos.gastoTotalSemana)}</p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Margen bruto proy. ({mesLabel})</p>
+              <p className="text-base font-bold text-gray-900 truncate">{cierreMes ? formatMoney(margenBrutoMes) : '—'}</p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Margen operación proy.</p>
               <p className="text-base font-bold text-gray-900 truncate">{cierreMes ? formatMoney(margenOperacionMes) : '—'}</p>
               {margenOperacionYoyPct != null && (
-                <p className="text-[9px] font-semibold" style={{ color: margenOperacionYoyPct >= 0 ? GOOD : CRITICAL }}>
+                <p className="text-[9px] font-semibold truncate" style={{ color: margenOperacionYoyPct >= 0 ? GOOD : CRITICAL }}>
                   {margenOperacionYoyPct >= 0 ? '+' : ''}{margenOperacionYoyPct.toFixed(1)}% YoY
                 </p>
               )}
