@@ -32,6 +32,8 @@ function YoYChart({ serie, promedioGeneral }) {
 
   return (
     <div>
+    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="min-w-[760px]">
       <div className="flex gap-1 sm:gap-3 mb-2">
         {serie.map((s, i) => {
           const yoyPct = s.anterior ? ((s.actual - s.anterior) / s.anterior) * 100 : null
@@ -96,7 +98,9 @@ function YoYChart({ serie, promedioGeneral }) {
           <div key={s.mes} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{s.mes}</div>
         ))}
       </div>
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+    </div>
+    </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Venta promedio del mes
         </span>
@@ -164,7 +168,7 @@ function TendenciaChart({ data }) {
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Arriba del promedio de su día
         </span>
@@ -234,7 +238,7 @@ function DiaSemanaChart({ porDiaSemana }) {
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Promedio real del mes
         </span>

@@ -18,11 +18,11 @@ function estadoMargen(pct) {
 function MargenCard({ titulo, monto, pct, sub }) {
   const color = estadoMargen(pct)
   return (
-    <Card className="flex items-center gap-5">
+    <Card className="flex flex-col sm:flex-row items-center gap-3 sm:gap-5 text-center sm:text-left">
       <DonutGauge pct={pct ?? 0} color={color} size={84} stroke={9} />
-      <div className="min-w-0">
+      <div className="min-w-0 w-full">
         <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{titulo}</p>
-        <p className="text-2xl font-bold text-gray-900 tabular-nums">{formatMoney(monto)}</p>
+        <p className="text-xl sm:text-2xl font-bold text-gray-900 tabular-nums truncate">{formatMoney(monto)}</p>
         {sub && <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{sub}</p>}
       </div>
     </Card>

@@ -102,7 +102,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 h-full overflow-y-auto print:w-full print:h-auto print:overflow-visible">
+      <main className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden print:w-full print:h-auto print:overflow-visible">
         <Outlet />
       </main>
     </div>

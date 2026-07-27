@@ -46,12 +46,12 @@ function estadoMargen(pct) {
 function MargenHero({ label, valor, pctVenta, yoyPct, sub }) {
   const color = estadoMargen(pctVenta)
   return (
-    <Card className="flex items-center gap-6">
+    <Card className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left">
       <DonutGauge pct={pctVenta ?? 0} color={color} size={104} stroke={10} />
-      <div className="min-w-0">
+      <div className="min-w-0 w-full">
         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
-        <p className="text-4xl font-bold text-gray-900 tabular-nums mb-2 leading-none">{formatMoney(valor)}</p>
-        <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-2xl sm:text-4xl font-bold text-gray-900 tabular-nums mb-2 leading-none truncate">{formatMoney(valor)}</p>
+        <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
           <DeltaPill pct={yoyPct} suffix=" YoY" />
           {sub && <span className="text-xs text-gray-400">{sub}</span>}
         </div>
@@ -113,10 +113,10 @@ function TendenciaMargenChart({ serie }) {
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#e3c780' }} /> Margen bruto</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Margen de operación</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm opacity-55" style={{ background: GOLD_RAMP[1] }} /> Mes proyectado (no cerrado)</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: '#e3c780' }} /> Margen bruto</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: GOLD_RAMP[1] }} /> Margen de operación</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm flex-shrink-0 opacity-55" style={{ background: GOLD_RAMP[1] }} /> Mes proyectado (no cerrado)</span>
       </div>
     </div>
   )
@@ -128,9 +128,9 @@ function ProveedorProyeccion({ p }) {
   const { color } = estadoPresupuesto(p.pct)
   return (
     <div className="rounded-lg border border-gray-100 bg-white p-3">
-      <div className="flex items-center justify-between gap-3 mb-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 mb-2">
         <span className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</span>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
           <span className="text-sm font-bold text-gray-800 tabular-nums">{formatMoney(p.gastoProyectado)}</span>
           {p.pct != null && <EstadoBadge pct={p.pct} size={10} />}
         </div>
@@ -169,21 +169,21 @@ function CategoriaProyeccion({ c }) {
         onClick={() => setAbierto(a => !a)}
         className="w-full text-left py-4 hover:bg-gray-50/60 transition-colors px-1 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
       >
-        <div className="flex items-center justify-between gap-3 mb-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 mb-2.5">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={15} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />}
-            <span className="text-sm font-bold text-gray-900">{c.nombre}</span>
-            {c.tipo && <span className="text-xs text-gray-400 font-medium">{c.tipo}</span>}
+            <span className="text-sm font-bold text-gray-900 truncate">{c.nombre}</span>
+            {c.tipo && <span className="hidden sm:inline text-xs text-gray-400 font-medium flex-shrink-0">{c.tipo}</span>}
           </div>
           <EstadoBadge pct={c.pctProyectado} />
         </div>
         <div className="flex items-center gap-3 pl-6 flex-wrap">
           <MiniBar pct={c.pctProyectado ?? 0} color={color} />
-          <p className="text-xs text-gray-400 flex-shrink-0 tabular-nums">
+          <p className="text-xs text-gray-400 min-w-0 tabular-nums">
             {formatMoney(c.gastoProyectado)} <span className="text-gray-300">proyectado de</span> {formatMoney(c.limiteMes)}
           </p>
           {c.varianzaProyectada != null && (
-            <span className="text-xs font-bold flex-shrink-0" style={{ color: sobreLimite ? CRITICAL : GOOD }}>
+            <span className="text-xs font-bold" style={{ color: sobreLimite ? CRITICAL : GOOD }}>
               {sobreLimite ? '+' : ''}{formatMoney(c.varianzaProyectada)} {sobreLimite ? 'sobre el límite' : 'bajo el límite'}
             </span>
           )}

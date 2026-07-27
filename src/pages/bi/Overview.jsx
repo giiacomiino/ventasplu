@@ -42,7 +42,9 @@ function VentasChart({ serie, promedioGeneral }) {
 
   return (
     <div>
-      <div className="flex gap-3 mb-2">
+    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="min-w-[640px]">
+      <div className="flex gap-1 sm:gap-3 mb-2">
         {serie.map((s, i) => {
           const yoyPct = s.anterior ? ((s.actual - s.anterior) / s.anterior) * 100 : null
           return (
@@ -101,14 +103,16 @@ function VentasChart({ serie, promedioGeneral }) {
           ))}
         </div>
       </div>
-      <div className="flex gap-3 mt-2">
+      <div className="flex gap-1 sm:gap-3 mt-2">
         {serie.map((s, i) => (
           <div key={i} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{s.mes}</div>
         ))}
       </div>
-      <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-50 text-xs text-gray-400">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Este año</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#e5e2da]" /> Año anterior</span>
+    </div>
+    </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 pt-4 border-t border-gray-50 text-xs text-gray-400">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: GOLD_RAMP[1] }} /> Este año</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm flex-shrink-0 bg-[#e5e2da]" /> Año anterior</span>
       </div>
     </div>
   )

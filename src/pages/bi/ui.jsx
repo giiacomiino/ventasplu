@@ -59,7 +59,7 @@ export function KpiTile({ label, value, delta, sub }) {
       {/* min-h reserva espacio para 2 líneas: así el número arranca a la
           misma altura sin importar si la etiqueta es corta o larga */}
       <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider leading-tight min-h-[28px] flex items-start">{label}</p>
-      <p className="text-3xl font-bold text-gray-900 tabular-nums leading-none truncate">{value}</p>
+      <p className="text-xl sm:text-3xl font-bold text-gray-900 tabular-nums leading-none truncate">{value}</p>
       {(delta || sub) && (
         <div className="flex flex-col gap-1.5 mt-auto pt-1 min-w-0">
           {delta && <div className="flex items-center gap-1.5 flex-wrap">{delta}</div>}

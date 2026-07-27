@@ -67,7 +67,7 @@ function ProveedorRow({ p, maxMonto }) {
         onClick={() => setAbierto(a => !a)}
         className="w-full text-left py-4 hover:bg-gray-50/60 transition-colors px-1 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
       >
-        <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 mb-2">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={15} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />}
             <span className="text-sm font-bold text-gray-900 truncate">{p.nombre}</span>
@@ -78,12 +78,12 @@ function ProveedorRow({ p, maxMonto }) {
               {restoTags > 0 && <span className="text-[10px] font-semibold text-gray-400">+{restoTags}</span>}
             </div>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-shrink-0 pl-6 sm:pl-0">
             <span className="text-xs text-gray-400">{p.facturas} factura{p.facturas === 1 ? '' : 's'}</span>
             {p.yoyPct != null && <DeltaPill pct={p.yoyPct} invert suffix=" YoY" compact />}
           </div>
         </div>
-        <div className="flex items-center gap-3 pl-6">
+        <div className="flex items-center gap-3 pl-6 flex-wrap">
           <MiniBar pct={maxMonto ? p.monto / maxMonto : 0} color={GOLD_RAMP[1]} />
           <span className="text-sm font-bold text-gray-800 tabular-nums flex-shrink-0">{formatMoney(p.monto)}</span>
           <span className="text-xs text-gray-400 flex-shrink-0">{p.pctDelTotal != null ? `${(p.pctDelTotal * 100).toFixed(1)}% del total` : ''}</span>

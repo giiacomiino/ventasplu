@@ -46,7 +46,8 @@ function GraficaProveedor({ serieMensual, impliedBudget }) {
   const alturaLinea = impliedBudget ? Math.min((impliedBudget / max) * 100, 100) : null
 
   return (
-    <div>
+    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="min-w-[440px]">
       <div className="flex gap-2.5 mb-2">
         {serieMensual.map((s, i) => {
           const yoyPct = s.montoAnterior ? ((s.monto - s.montoAnterior) / s.montoAnterior) * 100 : null
@@ -104,13 +105,15 @@ function GraficaProveedor({ serieMensual, impliedBudget }) {
         ))}
       </div>
     </div>
+    </div>
   )
 }
 
 function FacturasProveedor({ facturas }) {
   if (facturas.length === 0) return <p className="text-xs text-gray-300 py-3">Sin facturas pagadas este mes</p>
   return (
-    <table className="w-full text-xs mt-1">
+    <div className="overflow-x-auto -mx-1 px-1">
+    <table className="w-full text-xs mt-1 min-w-[380px]">
       <thead>
         <tr className="text-gray-400 border-b border-gray-100">
           <th className="text-left font-bold uppercase tracking-wide pb-2">Fecha</th>
@@ -130,6 +133,7 @@ function FacturasProveedor({ facturas }) {
         ))}
       </tbody>
     </table>
+    </div>
   )
 }
 
@@ -143,16 +147,16 @@ function ProveedorRolling({ p }) {
         onClick={() => setAbierto(a => !a)}
         className="w-full text-left p-3 rounded-lg hover:bg-gray-50/80 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
       >
-        <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 mb-2">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={13} className="text-gray-300 flex-shrink-0" /> : <ChevronDown size={13} className="text-gray-300 flex-shrink-0" />}
             <span className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</span>
           </div>
           <EstadoBadge pct={p.pct} size={11} />
         </div>
-        <div className="flex items-center gap-3 pl-5">
+        <div className="flex items-center gap-3 pl-5 flex-wrap">
           <MiniBar pct={p.pct ?? 0} color={color} />
-          <p className="text-xs text-gray-400 flex-shrink-0">
+          <p className="text-xs text-gray-400 min-w-0">
             {formatMoney(p.gastoActual)} de {p.impliedBudget != null ? formatMoney(p.impliedBudget) : '—'}
             <span className="text-gray-300"> · {p.share != null ? `${(p.share * 100).toFixed(1)}% hist.` : 'sin historial'}</span>
           </p>
@@ -183,17 +187,17 @@ function CategoriaRow({ c, detalle, cargandoArbol }) {
         onClick={() => setAbierto(a => !a)}
         className="w-full text-left py-4 hover:bg-gray-50/60 transition-colors px-1 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
       >
-        <div className="flex items-center justify-between gap-3 mb-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 mb-2.5">
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={15} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />}
-            <span className="text-sm font-bold text-gray-900">{c.nombre}</span>
-            {c.tipo && <span className="text-xs text-gray-400 font-medium">{c.tipo}</span>}
+            <span className="text-sm font-bold text-gray-900 truncate">{c.nombre}</span>
+            {c.tipo && <span className="hidden sm:inline text-xs text-gray-400 font-medium flex-shrink-0">{c.tipo}</span>}
           </div>
           <EstadoBadge pct={c.porcentajeUtilizado} />
         </div>
-        <div className="flex items-center gap-3 pl-6">
+        <div className="flex items-center gap-3 pl-6 flex-wrap">
           <MiniBar pct={c.porcentajeUtilizado ?? 0} color={color} />
-          <p className="text-xs text-gray-400 flex-shrink-0 tabular-nums">
+          <p className="text-xs text-gray-400 min-w-0 tabular-nums">
             {formatMoney(c.gastoReal)} <span className="text-gray-300">de</span> {formatMoney(c.limiteMes)}
           </p>
         </div>
