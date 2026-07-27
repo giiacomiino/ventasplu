@@ -10,7 +10,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to="/business-intelligence" replace />
 
   async function handleSubmit(e) {
     e.preventDefault()

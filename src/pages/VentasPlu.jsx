@@ -45,11 +45,11 @@ function KpiCard({ label, value, mom, sub, accent }) {
   const pos = mom >= 0
   return (
     <div
-      className={`bg-white rounded-xl px-5 py-4 border ${accent ? 'border-l-4 border-gray-100' : 'border-gray-100'}`}
+      className={`bg-white rounded-xl px-3 py-3 sm:px-5 sm:py-4 border min-w-0 ${accent ? 'border-l-4 border-gray-100' : 'border-gray-100'}`}
       style={accent ? { borderLeftColor: accent } : {}}
     >
-      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">{value ?? '—'}</p>
+      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold truncate">{label}</p>
+      <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tabular-nums truncate">{value ?? '—'}</p>
       {mom != null && (
         <p className={`text-xs font-semibold mt-1 flex items-center gap-0.5 ${pos ? 'text-green-600' : 'text-red-500'}`}>
           {pos ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
@@ -157,7 +157,8 @@ function SubcatTable({ titulo, data, onRowClick }) {
         <h3 className="font-bold text-gray-800 text-sm">{titulo}</h3>
         <span className="text-xs text-gray-400">{formatMoney(totalMonto)}</span>
       </div>
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[420px]">
         <thead>
           <tr className="border-b">
             <th className="px-3 py-2 text-xs font-semibold text-gray-400 text-right w-8">#</th>
@@ -206,6 +207,7 @@ function SubcatTable({ titulo, data, onRowClick }) {
           </tfoot>
         )}
       </table>
+      </div>
     </div>
   )
 }
@@ -239,12 +241,12 @@ export default function VentasPlu() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-3 py-3 sm:px-6 sm:py-6">
 
         {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Ventas por PLU</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Ventas por PLU</h1>
             <p className="text-xs text-gray-400 mt-0.5 capitalize">
               {mesLabel} · datos al {ultimaFecha ? toLabel(new Date(ultimaFecha + 'T12:00')) : '…'}
             </p>
@@ -284,7 +286,7 @@ export default function VentasPlu() {
         ) : (
           <>
             {/* ── KPI row ── */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
               <KpiCard
                 label="Total unidades"
                 value={formatUnits(totUnidades)}
@@ -312,10 +314,10 @@ export default function VentasPlu() {
             </div>
 
             {/* ── Main grid ── */}
-            <div className="grid grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
               {/* Tables — left 3 cols */}
-              <div className="col-span-3 space-y-6">
+              <div className="lg:col-span-3 space-y-6">
                 <SubcatTable
                   titulo="Alimentos"
                   data={alimentos}
@@ -329,7 +331,7 @@ export default function VentasPlu() {
               </div>
 
               {/* Donuts — right 2 cols */}
-              <div className="col-span-2 space-y-6">
+              <div className="lg:col-span-2 space-y-6">
                 <div className="bg-white rounded-xl border border-gray-100 p-5">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide text-center mb-4">
                     Mix Alimentos
