@@ -163,11 +163,6 @@ Deno.serve(async (req) => {
       }
     }).sort((a, b) => b.gastoSemana - a.gastoSemana)
 
-    const mayoresVariaciones = [...categorias]
-      .filter(c => c.variacionPct != null && c.promedioSemanal > 0)
-      .sort((a, b) => Math.abs(b.variacionPct) - Math.abs(a.variacionPct))
-      .slice(0, 4)
-
     const gastoTotalSemana = categorias.reduce((s, c) => s + c.gastoSemana, 0)
 
     // ── Pagos fuertes de la semana (facturas más grandes registradas) ──
@@ -214,7 +209,6 @@ Deno.serve(async (req) => {
       gastos: {
         gastoTotalSemana,
         categorias,
-        mayoresVariaciones,
         pagosFuertes,
       },
       rh: { altas, bajas },

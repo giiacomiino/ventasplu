@@ -397,15 +397,6 @@ export default function BIReporteSemanal() {
             <div className="p-6 pb-0">
               <SectionHeader title="Gasto por categoría" sub="Esta semana vs. el promedio de las últimas 8 semanas" />
             </div>
-            {reporte.gastos.mayoresVariaciones.length > 0 && (
-              <div className="px-6 pb-4 flex flex-wrap gap-2">
-                {reporte.gastos.mayoresVariaciones.map(c => (
-                  <span key={c.nombre} className="inline-flex items-center gap-1.5 text-xs font-semibold bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5 text-gray-600">
-                    {c.nombre} <DeltaPill pct={c.variacionPct} invert compact />
-                  </span>
-                ))}
-              </div>
-            )}
             <div className="px-6 pb-2">
               {reporte.gastos.categorias.length === 0 ? (
                 <EmptyState>Sin gasto registrado esta semana</EmptyState>
@@ -441,7 +432,14 @@ export default function BIReporteSemanal() {
                 <EmptyState>Sin facturas registradas esta semana</EmptyState>
               ) : (
                 <Table>
-                  <Thead columns={['Fecha', 'Proveedor', 'Categoría', 'Monto']} />
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left pb-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
+                      <th className="text-left pb-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Proveedor</th>
+                      <th className="text-left pb-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Categoría</th>
+                      <th className="text-right pb-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Monto</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {reporte.gastos.pagosFuertes.map((f, i) => (
                       <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">

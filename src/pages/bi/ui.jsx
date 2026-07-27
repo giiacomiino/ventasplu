@@ -47,7 +47,7 @@ export function DeltaPill({ pct, suffix = '', invert = false, compact = false })
       }`}
       style={{ color: bueno ? GOOD : CRITICAL, background: bueno ? '#f0fdf4' : '#fef2f2' }}
     >
-      {bueno ? <TrendingUp size={compact ? 10 : 12} /> : <TrendingDown size={compact ? 10 : 12} />}
+      {pct >= 0 ? <TrendingUp size={compact ? 10 : 12} /> : <TrendingDown size={compact ? 10 : 12} />}
       {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%{suffix}
     </span>
   )
