@@ -1,8 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useProductos } from '../../hooks/useProductos'
 import Modal from '../ui/Modal'
 import { format } from 'date-fns'
 import { Pencil, Check, X, Plus, History, Trash2 } from 'lucide-react'
+
+// Número de orden en el que aparece el producto al registrar el día — para
+// que coincida con el orden de la tira diaria y ya no haya que buscarlo.
+function OrdenInput({ producto, onGuardar }) {
+  const [valor, setValor] = useState(producto.orden ?? '')
+  useEffect(() => { setValor(producto.orden ?? '') }, [producto.orden])
+
+  const guardar = () => {
+    const num = valor === '' ? null : Number(valor)
+    if (num !== (producto.orden ?? null)) onGuardar(producto.id, num)
+  }
+
+  return (
+    <input
+      type="number"
+      value={valor}
+      onChange={e => setValor(e.target.value)}
+      onBlur={guardar}
+      onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+      placeholder="—"
+      className="w-14 border rounded px-2 py-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
+    />
+  )
+}
 
 // Calcula vigente_hasta de cada precio a partir del siguiente
 function preciosConRango(precios) {
@@ -27,7 +51,7 @@ function diaAntes(isoStr) {
 }
 
 export default function ListaProductosModal({ onClose }) {
-  const { productos, loading, precioVigente, actualizarPrecio, agregarProducto, eliminarProducto } = useProductos()
+  const { productos, loading, precioVigente, actualizarPrecio, actualizarOrden, agregarProducto, eliminarProducto } = useProductos()
   const [editando, setEditando]       = useState(null)
   const [nuevoPrecio, setNuevo]       = useState('')
   const [nuevaFecha, setNuevaFecha]   = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -116,6 +140,7 @@ export default function ListaProductosModal({ onClose }) {
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white border-b shadow-sm">
               <tr>
+                <th className="text-center px-4 py-3 font-semibold text-gray-500 text-xs">Orden</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs">Producto</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs">Subcategoría</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-500 text-xs">Precio actual</th>
@@ -133,6 +158,9 @@ export default function ListaProductosModal({ onClose }) {
                 return [
                   /* Fila principal */
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                    <td className="px-4 py-2.5 text-center">
+                      <OrdenInput producto={p} onGuardar={actualizarOrden} />
+                    </td>
                     <td className="px-4 py-2.5 text-gray-800 font-medium">{p.nombre}</td>
                     <td className="px-4 py-2.5 text-gray-500">{p.subcategoria}</td>
 
@@ -217,7 +245,7 @@ export default function ListaProductosModal({ onClose }) {
                   /* Historial de precios expandido */
                   histOpen && (
                     <tr key={`hist-${p.id}`} className="bg-amber-50/40">
-                      <td colSpan={5} className="px-4 pb-3 pt-1">
+                      <td colSpan={6} className="px-4 pb-3 pt-1">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 pl-2">
                           Historial de precios — {p.nombre}
                         </p>

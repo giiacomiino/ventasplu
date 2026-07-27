@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS productos (
   subcategoria text NOT NULL,
   categoria    text NOT NULL CHECK (categoria IN ('Bebidas', 'Alimentos')),
   activo       boolean DEFAULT true,
-  created_at   timestamptz DEFAULT now()
+  created_at   timestamptz DEFAULT now(),
+  -- posición manual para que el registro diario respete el mismo orden
+  -- que la tira física de ventas; NULL = sin asignar, va al final
+  orden        integer
 );
 
 CREATE INDEX IF NOT EXISTS idx_productos_categoria    ON productos(categoria);

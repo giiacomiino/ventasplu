@@ -9,9 +9,10 @@ export function useProductos() {
     setLoading(true)
     const { data } = await supabase
       .from('productos')
-      .select(`id, nombre, subcategoria, categoria, activo, created_at,
+      .select(`id, nombre, subcategoria, categoria, activo, created_at, orden,
                precios (precio, vigente_desde)`)
       .eq('activo', true)
+      .order('orden', { ascending: true, nullsFirst: false })
       .order('categoria')
       .order('subcategoria')
       .order('nombre')
@@ -38,6 +39,12 @@ export function useProductos() {
     return error
   }
 
+  const actualizarOrden = async (id, orden) => {
+    const { error } = await supabase.from('productos').update({ orden }).eq('id', id)
+    if (!error) fetchProductos()
+    return error
+  }
+
   const agregarProducto = async ({ nombre, subcategoria, categoria }) => {
     const { error } = await supabase.from('productos').insert({ nombre, subcategoria, categoria })
     if (!error) fetchProductos()
@@ -50,5 +57,5 @@ export function useProductos() {
     return error
   }
 
-  return { productos, loading, precioVigente, actualizarPrecio, agregarProducto, eliminarProducto, refetch: fetchProductos }
+  return { productos, loading, precioVigente, actualizarPrecio, actualizarOrden, agregarProducto, eliminarProducto, refetch: fetchProductos }
 }
