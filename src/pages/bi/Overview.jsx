@@ -266,10 +266,10 @@ export default function BIOverview() {
             value={formatMoney(mtd.ventaNeta)}
             sub="mes al día de hoy"
             delta={
-              <div className="flex items-center gap-1.5">
+              <>
                 <DeltaPill pct={mtd.momPct} suffix=" MoM" compact />
                 <DeltaPill pct={mtd.yoyPct} suffix=" YoY" compact />
-              </div>
+              </>
             }
           />
         )}
