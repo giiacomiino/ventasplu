@@ -491,39 +491,39 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {cierre && (
-          <DomainCard
-            to="/business-intelligence/tendencia-cierre"
-            titulo="Tendencia de cierre"
-            sub="Cómo vamos a cerrar el mes, no cómo vamos hoy"
-            span={2}
-          >
-            <div className="flex items-center gap-6 py-1">
-              <DonutGauge
-                pct={ventaProyectadaCierre ? (margenOperacionProyectado ?? 0) / ventaProyectadaCierre : 0}
-                color={GOLD_RAMP[1]}
-                size={92}
-                stroke={9}
-              />
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Margen de operación proyectado</p>
-                <p className="text-2xl font-bold text-gray-900 tabular-nums mb-1.5 truncate">{formatMoney(margenOperacionProyectado)}</p>
-                <DeltaPill pct={margenOperacionYoyPct} suffix=" YoY" />
+        <div className="col-span-3 grid grid-cols-2 gap-6">
+          {cierre && (
+            <DomainCard
+              to="/business-intelligence/tendencia-cierre"
+              titulo="Tendencia de cierre"
+              sub="Cómo vamos a cerrar el mes, no cómo vamos hoy"
+            >
+              <div className="flex items-center gap-6 py-1">
+                <DonutGauge
+                  pct={ventaProyectadaCierre ? (margenOperacionProyectado ?? 0) / ventaProyectadaCierre : 0}
+                  color={GOLD_RAMP[1]}
+                  size={92}
+                  stroke={9}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Margen de operación proyectado</p>
+                  <p className="text-2xl font-bold text-gray-900 tabular-nums mb-1.5 truncate">{formatMoney(margenOperacionProyectado)}</p>
+                  <DeltaPill pct={margenOperacionYoyPct} suffix=" YoY" />
+                </div>
               </div>
-            </div>
-          </DomainCard>
-        )}
+            </DomainCard>
+          )}
 
-        <DomainCard
-          to="/business-intelligence/reporte-semanal"
-          titulo="Reporte semanal"
-          sub="Lunes a domingo — para reportar a dirección"
-          span={2}
-        >
-          <p className="text-sm text-gray-400 py-2">
-            Venta vs. promedio y YoY, gasto por categoría, pagos fuertes y movimientos de RH de la semana — navega otras semanas y exporta a PDF.
-          </p>
-        </DomainCard>
+          <DomainCard
+            to="/business-intelligence/reporte-semanal"
+            titulo="Reporte semanal"
+            sub="Lunes a domingo — para reportar a dirección"
+          >
+            <p className="text-sm text-gray-400 py-2">
+              Venta vs. promedio y YoY, gasto por categoría, pagos fuertes y movimientos de RH de la semana — navega otras semanas y exporta a PDF.
+            </p>
+          </DomainCard>
+        </div>
       </div>
     </div>
   )
