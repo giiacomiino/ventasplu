@@ -12,8 +12,8 @@ export default function AppLayout() {
     }`
 
   return (
-    <div className="h-screen flex bg-gray-50 overflow-hidden">
-      <aside className="w-56 flex-shrink-0 h-full bg-white border-r border-gray-100 flex flex-col">
+    <div className="h-screen flex bg-gray-50 overflow-hidden print:block print:h-auto print:bg-white">
+      <aside className="w-56 flex-shrink-0 h-full bg-white border-r border-gray-100 flex flex-col print:hidden">
         <div className="px-5 py-5 flex items-center gap-2.5">
           <img src={vuraLogo} alt="VURA" className="w-8 h-8 object-contain" />
           <div>
@@ -51,7 +51,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 h-full overflow-y-auto">
+      <main className="flex-1 min-w-0 h-full overflow-y-auto print:w-full print:h-auto print:overflow-visible">
         <Outlet />
       </main>
     </div>

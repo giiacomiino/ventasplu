@@ -513,6 +513,17 @@ export default function BIOverview() {
             </div>
           </DomainCard>
         )}
+
+        <DomainCard
+          to="/business-intelligence/reporte-semanal"
+          titulo="Reporte semanal"
+          sub="Lunes a domingo — para reportar a dirección"
+          span={2}
+        >
+          <p className="text-sm text-gray-400 py-2">
+            Venta vs. promedio y YoY, gasto por categoría, pagos fuertes y movimientos de RH de la semana — navega otras semanas y exporta a PDF.
+          </p>
+        </DomainCard>
       </div>
     </div>
   )
