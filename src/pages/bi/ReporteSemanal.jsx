@@ -11,17 +11,14 @@ import { useSemanaSeleccionada } from './useSemanaSeleccionada'
 
 const DIAS_CORTOS = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
-function Tooltip({ children }) {
-  return (
-    <div className="absolute -top-2 -translate-y-full z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg pointer-events-none left-1/2 -translate-x-1/2">
-      {children}
-    </div>
-  )
-}
-
 function formatK(n) {
   if (n == null) return '—'
   return `$${(n / 1000).toFixed(0)}k`
+}
+
+function formatInt(n) {
+  if (n == null) return '—'
+  return Math.round(n).toLocaleString('es-MX')
 }
 
 function SelectorSemana({ label, esSemanaActual, anterior, siguiente }) {
@@ -42,35 +39,32 @@ function SelectorSemana({ label, esSemanaActual, anterior, siguiente }) {
   )
 }
 
-// ─── Venta por día de la semana: real vs. promedio histórico ───────────────
+// ─── Serie diaria (venta o personas): real vs. promedio histórico ──────────
+// Etiquetas siempre visibles (no on-hover): el reporte se imprime/exporta a
+// PDF como documento estático, así que la variación tiene que explicarse
+// sola, sin depender de pasar el mouse.
 
-function VentaPorDiaChart({ ventaPorDia }) {
-  const [hover, setHover] = useState(null)
-  const max = Math.max(...ventaPorDia.flatMap(d => [d.ventaNeta, d.promedioHistorico ?? 0]), 1) * 1.15
+function SerieDiariaChart({ serie, valorKey, formatValor }) {
+  const max = Math.max(...serie.flatMap(d => [d[valorKey], d.promedioHistorico ?? 0]), 1) * 1.25
 
   return (
     <div>
-      <div className="relative flex items-end gap-4 h-56">
-        {ventaPorDia.map((d, i) => {
-          const real = d.ventaNeta
+      <div className="flex gap-4 mb-2">
+        {serie.map((d, i) => (
+          <div key={i} className="flex-1 flex justify-center">
+            {d.diferenciaPct != null ? <DeltaPill pct={d.diferenciaPct} compact /> : <span className="text-[10px] text-gray-300">sin dato</span>}
+          </div>
+        ))}
+      </div>
+      <div className="relative flex items-end gap-4 h-48">
+        {serie.map((d, i) => {
+          const real = d[valorKey]
           const hist = d.promedioHistorico ?? 0
           const alturaReal = Math.max((real / max) * 100, real ? 8 : 0)
           const alturaHist = (hist / max) * 100
           const faltante = Math.max(alturaHist - alturaReal, 0)
           return (
-            <div
-              key={d.fecha}
-              className="flex-1 h-full flex flex-col justify-end items-center relative cursor-pointer"
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-            >
-              {hover === i && (
-                <Tooltip>
-                  <p className="font-semibold">{format(new Date(`${d.fecha}T00:00:00`), 'EEEE d MMM', { locale: es })}</p>
-                  <p className="text-gray-300">Venta: {formatMoney(real)}</p>
-                  {d.promedioHistorico != null && <p className="text-gray-400">Promedio histórico: {formatMoney(d.promedioHistorico)}</p>}
-                </Tooltip>
-              )}
+            <div key={i} className="flex-1 h-full flex flex-col justify-end items-center relative">
               {faltante > 0 && (
                 <div
                   className="w-full rounded-t border-2 border-dashed border-b-0"
@@ -78,17 +72,16 @@ function VentaPorDiaChart({ ventaPorDia }) {
                 />
               )}
               <div
-                className="w-full relative transition-opacity"
+                className="w-full relative"
                 style={{
                   height: `${alturaReal}%`,
                   background: GOLD_RAMP[1],
-                  opacity: hover === i ? 0.75 : 1,
                   borderRadius: faltante > 0 ? '0' : '0.25rem 0.25rem 0 0',
                 }}
               >
                 {real > 0 && (
                   <span className="absolute top-1/2 left-0 right-0 -translate-y-1/2 text-center text-[10px] font-bold text-white whitespace-nowrap">
-                    {formatK(real)}
+                    {formatValor(real)}
                   </span>
                 )}
               </div>
@@ -97,16 +90,23 @@ function VentaPorDiaChart({ ventaPorDia }) {
         })}
       </div>
       <div className="flex gap-4 mt-1.5">
-        {ventaPorDia.map(d => (
-          <div key={d.fecha} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{DIAS_CORTOS[d.diaSemana]}</div>
+        {serie.map((d, i) => (
+          <div key={i} className="flex-1 text-center">
+            <p className="text-[10px] text-gray-400 font-medium">{DIAS_CORTOS[d.diaSemana]}</p>
+            <p className="text-[9px] text-gray-300 tabular-nums">prom: {formatValor(d.promedioHistorico)}</p>
+          </div>
         ))}
       </div>
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Venta real</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Real</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border-2 border-dashed" style={{ borderColor: GOLD_RAMP[1] }} /> Falta para el promedio histórico</span>
       </div>
     </div>
   )
+}
+
+function diaDeMayorVariacion(serie) {
+  return serie.filter(d => d.diferenciaPct != null).sort((a, b) => Math.abs(b.diferenciaPct) - Math.abs(a.diferenciaPct))[0] ?? null
 }
 
 export default function BIReporteSemanal() {
@@ -138,30 +138,74 @@ export default function BIReporteSemanal() {
   useEffect(() => {
     async function cargarPlu() {
       const domingoStr = format(semana.domingo, 'yyyy-MM-dd')
+
+      // El registro de ventas por PLU puede ir rezagado unos días (captura
+      // manual). Si comparamos una semana completa contra una semana
+      // parcialmente capturada, la variación sale artificialmente negativa.
+      // Se recorta la comparación al último día con datos disponibles, y se
+      // usa ese MISMO corte relativo en la semana anterior.
+      const { data: ultimaFilaConDatos } = await supabase
+        .from('ventas_plu')
+        .select('fecha')
+        .order('fecha', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const fechaCorte = ultimaFilaConDatos?.fecha ?? domingoStr
+      const finComparacionStr = fechaCorte < domingoStr ? fechaCorte : domingoStr
+      const diasIncluidos = Math.max(
+        Math.round((new Date(`${finComparacionStr}T00:00:00`) - semana.lunes) / (24 * 60 * 60 * 1000)) + 1,
+        1,
+      )
       const lunesAntStr = format(addDays(semana.lunes, -7), 'yyyy-MM-dd')
-      const domingoAntStr = format(addDays(semana.domingo, -7), 'yyyy-MM-dd')
+      const finComparacionAntStr = format(addDays(addDays(semana.lunes, -7), diasIncluidos - 1), 'yyyy-MM-dd')
+
       const [actual, anterior] = await Promise.all([
-        supabase.from('ventas_plu').select('monto, productos(categoria)').gte('fecha', semana.lunesStr).lte('fecha', domingoStr),
-        supabase.from('ventas_plu').select('monto, productos(categoria)').gte('fecha', lunesAntStr).lte('fecha', domingoAntStr),
+        supabase.from('ventas_plu').select('monto, producto_id, productos(nombre, categoria, subcategoria)')
+          .gte('fecha', semana.lunesStr).lte('fecha', finComparacionStr),
+        supabase.from('ventas_plu').select('monto, producto_id, productos(nombre, categoria, subcategoria)')
+          .gte('fecha', lunesAntStr).lte('fecha', finComparacionAntStr),
       ])
-      const agrupar = rows => {
+
+      const agruparPor = (rows, campo) => {
         const m = new Map()
         for (const r of rows ?? []) {
-          if (!r.productos?.categoria) continue
-          m.set(r.productos.categoria, (m.get(r.productos.categoria) ?? 0) + Number(r.monto || 0))
+          if (!r.productos) continue
+          const clave = campo === 'producto' ? r.producto_id : r.productos[campo]
+          if (!clave) continue
+          const actual = m.get(clave) ?? { monto: 0, nombre: campo === 'producto' ? r.productos.nombre : clave, categoria: r.productos.categoria }
+          actual.monto += Number(r.monto || 0)
+          m.set(clave, actual)
         }
         return m
       }
-      const montoActual = agrupar(actual.data)
-      const montoAnterior = agrupar(anterior.data)
-      const nombres = new Set([...montoActual.keys(), ...montoAnterior.keys()])
-      const categorias = [...nombres].map(nombre => {
-        const monto = montoActual.get(nombre) ?? 0
-        const anteriorMonto = montoAnterior.get(nombre) ?? 0
+
+      const subcatActual = agruparPor(actual.data, 'subcategoria')
+      const subcatAnterior = agruparPor(anterior.data, 'subcategoria')
+      const nombresSubcat = new Set([...subcatActual.keys(), ...subcatAnterior.keys()])
+      const subcategorias = [...nombresSubcat].map(nombre => {
+        const monto = subcatActual.get(nombre)?.monto ?? 0
+        const anteriorMonto = subcatAnterior.get(nombre)?.monto ?? 0
         const variacionPct = anteriorMonto ? ((monto - anteriorMonto) / anteriorMonto) * 100 : null
         return { nombre, monto, anteriorMonto, variacionPct }
       }).sort((a, b) => b.monto - a.monto)
-      setPlu({ categorias })
+
+      const prodActual = agruparPor(actual.data, 'producto')
+      const prodAnterior = agruparPor(anterior.data, 'producto')
+      const idsProductos = new Set([...prodActual.keys(), ...prodAnterior.keys()])
+      const productos = [...idsProductos].map(id => {
+        const a = prodActual.get(id)
+        const b = prodAnterior.get(id)
+        const monto = a?.monto ?? 0
+        const anteriorMonto = b?.monto ?? 0
+        const variacionMonto = monto - anteriorMonto
+        const variacionPct = anteriorMonto ? (variacionMonto / anteriorMonto) * 100 : null
+        return { nombre: a?.nombre ?? b?.nombre ?? 'Producto', monto, anteriorMonto, variacionMonto, variacionPct }
+      })
+
+      const topPositivos = [...productos].filter(p => p.variacionMonto > 0).sort((a, b) => b.variacionMonto - a.variacionMonto).slice(0, 5)
+      const topNegativos = [...productos].filter(p => p.variacionMonto < 0).sort((a, b) => a.variacionMonto - b.variacionMonto).slice(0, 5)
+
+      setPlu({ subcategorias, topPositivos, topNegativos, fechaCorte, semanaIncompleta: fechaCorte < domingoStr })
     }
     cargarPlu()
   }, [semana.lunesStr])
@@ -235,7 +279,7 @@ export default function BIReporteSemanal() {
               title="Venta por día de la semana"
               sub="Cada día vs. su propio promedio histórico"
             />
-            <VentaPorDiaChart ventaPorDia={reporte.ventas.ventaPorDia} />
+            <SerieDiariaChart serie={reporte.ventas.ventaPorDia} valorKey="ventaNeta" formatValor={formatK} />
             {reporte.ventas.diaDestacado && (
               <p className="text-sm text-gray-600 mt-4 pt-4 border-t border-gray-100">
                 <span className="font-bold" style={{ color: reporte.ventas.diaDestacado.diferenciaPct >= 0 ? GOLD_RAMP[1] : '#d03b3b' }}>
@@ -247,33 +291,106 @@ export default function BIReporteSemanal() {
             )}
           </Card>
 
+          <Card className="print-card">
+            <SectionHeader
+              title="Personas atendidas por día"
+              sub="Cada día vs. el promedio de las últimas 8 semanas"
+            />
+            <SerieDiariaChart serie={reporte.ventas.personasPorDia} valorKey="personas" formatValor={formatInt} />
+            {(() => {
+              const destacado = diaDeMayorVariacion(reporte.ventas.personasPorDia)
+              return destacado && (
+                <p className="text-sm text-gray-600 mt-4 pt-4 border-t border-gray-100">
+                  <span className="font-bold" style={{ color: destacado.diferenciaPct >= 0 ? GOLD_RAMP[1] : '#d03b3b' }}>
+                    {DIAS[destacado.diaSemana]}
+                  </span>{' '}
+                  fue el día de mayor variación en afluencia: {destacado.diferenciaPct >= 0 ? '+' : ''}
+                  {destacado.diferenciaPct.toFixed(1)}% vs. su promedio ({formatInt(destacado.personas)} personas).
+                </p>
+              )
+            })()}
+          </Card>
+
           {plu && (
-            <Card padded={false} className="print-card">
-              <div className="p-6 pb-0">
-                <SectionHeader title="Ventas por tipo de PLU" sub="Categoría de producto, esta semana vs. la semana anterior" />
+            <>
+              <Card padded={false} className="print-card">
+                <div className="p-6 pb-0">
+                  <SectionHeader title="Ventas por subcategoría de PLU" sub="Esta semana vs. la semana anterior (mismo corte de días)" />
+                </div>
+                <div className="px-6 pb-2">
+                  {plu.subcategorias.length === 0 ? (
+                    <EmptyState>Sin ventas por PLU registradas esta semana</EmptyState>
+                  ) : (
+                    <Table>
+                      <Thead columns={['Subcategoría', 'Semana anterior', 'Esta semana', 'Variación']} />
+                      <tbody>
+                        {plu.subcategorias.map(c => (
+                          <tr key={c.nombre} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
+                            <td className="py-2.5 text-gray-700 font-medium">{c.nombre}</td>
+                            <td className="py-2.5 text-right text-gray-400 tabular-nums">{formatMoney(c.anteriorMonto)}</td>
+                            <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">{formatMoney(c.monto)}</td>
+                            <td className="py-2.5 text-right">
+                              {c.variacionPct != null ? <DeltaPill pct={c.variacionPct} compact /> : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </div>
+                <p className="px-6 py-3 text-xs text-gray-400 border-t border-gray-50 mt-2">
+                  Datos de ventas por PLU actualizados hasta: <span className="font-semibold text-gray-500">{format(new Date(`${plu.fechaCorte}T00:00:00`), "d 'de' MMMM yyyy", { locale: es })}</span>
+                  {plu.semanaIncompleta && ' — semana en curso incompleta; la comparación usa el mismo corte de días en ambas semanas.'}
+                </p>
+              </Card>
+
+              <div className="grid grid-cols-2 gap-5 print-card">
+                <Card padded={false}>
+                  <div className="p-6 pb-3">
+                    <SectionHeader title="Top 5 — mayor variación positiva" sub="Productos con más crecimiento vs. la semana anterior" />
+                  </div>
+                  <div className="px-6 pb-4">
+                    {plu.topPositivos.length === 0 ? (
+                      <EmptyState>Sin variaciones positivas</EmptyState>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {plu.topPositivos.map(p => (
+                          <div key={p.nombre} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-gray-700 font-medium truncate">{p.nombre}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="font-bold text-gray-800 tabular-nums">+{formatMoney(p.variacionMonto)}</span>
+                              {p.variacionPct != null && <DeltaPill pct={p.variacionPct} compact />}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+                <Card padded={false}>
+                  <div className="p-6 pb-3">
+                    <SectionHeader title="Top 5 — mayor variación negativa" sub="Productos con más caída vs. la semana anterior" />
+                  </div>
+                  <div className="px-6 pb-4">
+                    {plu.topNegativos.length === 0 ? (
+                      <EmptyState>Sin variaciones negativas</EmptyState>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {plu.topNegativos.map(p => (
+                          <div key={p.nombre} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-gray-700 font-medium truncate">{p.nombre}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="font-bold text-gray-800 tabular-nums">{formatMoney(p.variacionMonto)}</span>
+                              {p.variacionPct != null && <DeltaPill pct={p.variacionPct} compact />}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
               </div>
-              <div className="px-6 pb-2">
-                {plu.categorias.length === 0 ? (
-                  <EmptyState>Sin ventas por PLU registradas esta semana</EmptyState>
-                ) : (
-                  <Table>
-                    <Thead columns={['Categoría', 'Semana anterior', 'Esta semana', 'Variación']} />
-                    <tbody>
-                      {plu.categorias.map(c => (
-                        <tr key={c.nombre} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
-                          <td className="py-2.5 text-gray-700 font-medium">{c.nombre}</td>
-                          <td className="py-2.5 text-right text-gray-400 tabular-nums">{formatMoney(c.anteriorMonto)}</td>
-                          <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">{formatMoney(c.monto)}</td>
-                          <td className="py-2.5 text-right">
-                            {c.variacionPct != null ? <DeltaPill pct={c.variacionPct} compact /> : <span className="text-gray-300 text-xs">—</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                )}
-              </div>
-            </Card>
+            </>
           )}
 
           <Card padded={false} className="print-card">

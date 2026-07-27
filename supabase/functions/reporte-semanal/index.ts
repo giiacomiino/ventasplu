@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, requireRole } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, isoWeekday, requireRole } from '../_shared/bubble.ts'
 
 // Reporte semanal (lunes a domingo) para dirección: venta vs. promedio y
 // YoY, gasto por categoría vs. su promedio semanal histórico, facturas
@@ -34,6 +34,7 @@ Deno.serve(async (req) => {
       inventarioSemanaCrudas,
       inventarioBaseCrudas,
       empleados,
+      ventaBaseData,
     ] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Categorías', { constraints: JSON.stringify(conOrg()), limit: '100' }),
       bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
@@ -62,6 +63,16 @@ Deno.serve(async (req) => {
         { key: 'borrada?', constraint_type: 'equals', value: false },
       )),
       bubbleGetAllFast(bubbleUrl, bubbleToken, 'Empleado', conOrg()),
+      // Sin tabla de "promedio de personas por día" precalculada (a
+      // diferencia de PromedioVentaDiaSemana), así que se saca del
+      // histórico de las mismas 8 semanas usadas como línea base de gasto.
+      bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
+        constraints: JSON.stringify(conOrg(
+          { key: 'DiaDeVenta', constraint_type: 'greater than', value: inicioBase.toISOString() },
+          { key: 'DiaDeVenta', constraint_type: 'less than', value: inicioSemana.toISOString() },
+        )),
+        limit: '100',
+      }),
     ])
 
     const tipoPorNombre = new Map(
@@ -92,6 +103,27 @@ Deno.serve(async (req) => {
 
     const ventaMismaSemanaAnioAnterior = ventaAnioAntData.response.results.reduce((s: number, v: any) => s + (v.VentaNeta || 0), 0)
     const ventaYoyPct = ventaMismaSemanaAnioAnterior ? ((ventaSemana - ventaMismaSemanaAnioAnterior) / ventaMismaSemanaAnioAnterior) * 100 : null
+
+    // ── Personas atendidas por día, vs. promedio de las mismas 8 semanas ──
+    const personasAcumPorDia = new Map<number, { suma: number; n: number }>()
+    for (const v of ventaBaseData.response.results) {
+      const dia = isoWeekday(v.DiaDeVenta)
+      const acc = personasAcumPorDia.get(dia) ?? { suma: 0, n: 0 }
+      acc.suma += v['# Personas'] || 0
+      acc.n += 1
+      personasAcumPorDia.set(dia, acc)
+    }
+    const promedioPersonasPorDia = new Map(
+      [...personasAcumPorDia.entries()].map(([dia, acc]) => [dia, acc.n ? acc.suma / acc.n : null]),
+    )
+
+    const personasPorDia = ventaPorDia.map(d => {
+      const v = ventaPorFecha.get(d.fecha)
+      const personasDia = v?.['# Personas'] ?? 0
+      const promedioHistorico = promedioPersonasPorDia.get(d.diaSemana) ?? null
+      const diferenciaPct = promedioHistorico ? ((personasDia - promedioHistorico) / promedioHistorico) * 100 : null
+      return { fecha: d.fecha, diaSemana: d.diaSemana, personas: personasDia, promedioHistorico, diferenciaPct }
+    })
 
     const personas = [...ventaPorFecha.values()].reduce((s: number, v: any) => s + (v['# Personas'] || 0), 0)
     const ticketPromedio = personas ? ventaSemana / personas : null
@@ -177,6 +209,7 @@ Deno.serve(async (req) => {
         ventaYoyPct,
         ventaPorDia,
         diaDestacado,
+        personasPorDia,
       },
       gastos: {
         gastoTotalSemana,
