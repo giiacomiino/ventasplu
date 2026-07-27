@@ -5,7 +5,7 @@ import { formatMoney } from '../../utils/formatters'
 import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { supabase } from '../../lib/supabase'
-import { llamar, DIAS, GOLD_RAMP } from './shared'
+import { llamar, DIAS, GOLD_RAMP, GOOD, CRITICAL } from './shared'
 import { Card, SectionHeader, PageHeader, KpiTile, DeltaPill, Table, Thead, LoadingState, ErrorState, EmptyState } from './ui'
 import { useSemanaSeleccionada } from './useSemanaSeleccionada'
 
@@ -44,7 +44,26 @@ function SelectorSemana({ label, esSemanaActual, anterior, siguiente }) {
 // PDF como documento estático, así que la variación tiene que explicarse
 // sola, sin depender de pasar el mouse.
 
-function SerieDiariaChart({ serie, valorKey, formatValor }) {
+// Monto antes que porcentaje: para leer la variación en pesos de un
+// vistazo (el % va de acompañante, chiquito).
+function EtiquetaVariacion({ real, promedio, formatValor }) {
+  if (promedio == null) return <span className="text-[10px] text-gray-300">sin dato</span>
+  const diff = real - promedio
+  const pct = promedio ? (diff / promedio) * 100 : null
+  const color = diff >= 0 ? GOOD : CRITICAL
+  return (
+    <div className="text-center leading-tight">
+      <p className="text-xs font-bold tabular-nums whitespace-nowrap" style={{ color }}>
+        {diff >= 0 ? '+' : ''}{formatValor(diff)}
+      </p>
+      {pct != null && (
+        <p className="text-[9px] font-semibold" style={{ color }}>({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</p>
+      )}
+    </div>
+  )
+}
+
+function SerieDiariaChart({ serie, valorKey, formatValor, compacto = false }) {
   const max = Math.max(...serie.flatMap(d => [d[valorKey], d.promedioHistorico ?? 0]), 1) * 1.25
 
   return (
@@ -52,11 +71,11 @@ function SerieDiariaChart({ serie, valorKey, formatValor }) {
       <div className="flex gap-4 mb-2">
         {serie.map((d, i) => (
           <div key={i} className="flex-1 flex justify-center">
-            {d.diferenciaPct != null ? <DeltaPill pct={d.diferenciaPct} compact /> : <span className="text-[10px] text-gray-300">sin dato</span>}
+            <EtiquetaVariacion real={d[valorKey]} promedio={d.promedioHistorico} formatValor={formatValor} />
           </div>
         ))}
       </div>
-      <div className="relative flex items-end gap-4 h-48">
+      <div className={`relative flex items-end gap-4 ${compacto ? 'h-20' : 'h-48'}`}>
         {serie.map((d, i) => {
           const real = d[valorKey]
           const hist = d.promedioHistorico ?? 0
@@ -97,10 +116,12 @@ function SerieDiariaChart({ serie, valorKey, formatValor }) {
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Real</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border-2 border-dashed" style={{ borderColor: GOLD_RAMP[1] }} /> Falta para el promedio histórico</span>
-      </div>
+      {!compacto && (
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-400">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: GOLD_RAMP[1] }} /> Real</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border-2 border-dashed" style={{ borderColor: GOLD_RAMP[1] }} /> Falta para el promedio histórico</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -250,7 +271,7 @@ export default function BIReporteSemanal() {
       {error && <ErrorState message={error} />}
 
       {reporte && (
-        <>
+        <div className="print:hidden space-y-8">
           <section className="grid grid-cols-4 gap-5 print-card">
             <KpiTile
               label="Venta neta de la semana"
@@ -285,8 +306,9 @@ export default function BIReporteSemanal() {
                 <span className="font-bold" style={{ color: reporte.ventas.diaDestacado.diferenciaPct >= 0 ? GOLD_RAMP[1] : '#d03b3b' }}>
                   {DIAS[reporte.ventas.diaDestacado.diaSemana]}
                 </span>{' '}
-                fue el día de mayor variación: {reporte.ventas.diaDestacado.diferenciaPct >= 0 ? '+' : ''}
-                {reporte.ventas.diaDestacado.diferenciaPct.toFixed(1)}% vs. su promedio ({formatMoney(reporte.ventas.diaDestacado.ventaNeta)}).
+                fue el día de mayor variación: {reporte.ventas.diaDestacado.ventaNeta >= reporte.ventas.diaDestacado.promedioHistorico ? '+' : ''}
+                {formatMoney(reporte.ventas.diaDestacado.ventaNeta - reporte.ventas.diaDestacado.promedioHistorico)} vs. su promedio
+                ({reporte.ventas.diaDestacado.diferenciaPct >= 0 ? '+' : ''}{reporte.ventas.diaDestacado.diferenciaPct.toFixed(1)}%).
               </p>
             )}
           </Card>
@@ -304,8 +326,9 @@ export default function BIReporteSemanal() {
                   <span className="font-bold" style={{ color: destacado.diferenciaPct >= 0 ? GOLD_RAMP[1] : '#d03b3b' }}>
                     {DIAS[destacado.diaSemana]}
                   </span>{' '}
-                  fue el día de mayor variación en afluencia: {destacado.diferenciaPct >= 0 ? '+' : ''}
-                  {destacado.diferenciaPct.toFixed(1)}% vs. su promedio ({formatInt(destacado.personas)} personas).
+                  fue el día de mayor variación en afluencia: {destacado.personas >= destacado.promedioHistorico ? '+' : ''}
+                  {formatInt(destacado.personas - destacado.promedioHistorico)} personas vs. su promedio
+                  ({destacado.diferenciaPct >= 0 ? '+' : ''}{destacado.diferenciaPct.toFixed(1)}%).
                 </p>
               )
             })()}
@@ -504,12 +527,104 @@ export default function BIReporteSemanal() {
                 de lo esperado según el promedio histórico de cada día
                 {reporte.ventas.ventaSemanaVsPromedioPct != null ? ` (${reporte.ventas.ventaSemanaVsPromedioPct >= 0 ? '+' : ''}${reporte.ventas.ventaSemanaVsPromedioPct.toFixed(1)}%)` : ''}.
               </p>
-              <Link to="/business-intelligence/tendencia-cierre" className="inline-block text-sm font-semibold mt-4 hover:underline print:hidden" style={{ color: GOLD_RAMP[1] }}>
+              <Link to="/business-intelligence/tendencia-cierre" className="inline-block text-sm font-semibold mt-4 hover:underline" style={{ color: GOLD_RAMP[1] }}>
                 Ver detalle completo de la tendencia de cierre →
               </Link>
             </Card>
           )}
-        </>
+        </div>
+      )}
+
+      {reporte && (
+        <div className="hidden print:block text-sm">
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Venta de la semana</p>
+              <p className="text-base font-bold text-gray-900 truncate">{formatMoney(reporte.ventas.ventaSemana)}</p>
+              <p className="text-[9px] font-semibold" style={{ color: reporte.ventas.ventaSemanaVsPromedioMonto >= 0 ? GOOD : CRITICAL }}>
+                {reporte.ventas.ventaSemanaVsPromedioMonto >= 0 ? '+' : ''}{formatMoney(reporte.ventas.ventaSemanaVsPromedioMonto)} vs. prom.
+              </p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Gasto de la semana</p>
+              <p className="text-base font-bold text-gray-900 truncate">{formatMoney(reporte.gastos.gastoTotalSemana)}</p>
+              <p className="text-[9px] text-gray-400">{reporte.ventas.personas.toLocaleString('es-MX')} personas atendidas</p>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-2.5 min-w-0">
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide">Margen operación proy. ({mesLabel})</p>
+              <p className="text-base font-bold text-gray-900 truncate">{cierreMes ? formatMoney(margenOperacionMes) : '—'}</p>
+              {margenOperacionYoyPct != null && (
+                <p className="text-[9px] font-semibold" style={{ color: margenOperacionYoyPct >= 0 ? GOOD : CRITICAL }}>
+                  {margenOperacionYoyPct >= 0 ? '+' : ''}{margenOperacionYoyPct.toFixed(1)}% YoY
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-3 mb-3">
+            <p className="text-xs font-bold text-gray-800 mb-1">Venta por día</p>
+            <SerieDiariaChart serie={reporte.ventas.ventaPorDia} valorKey="ventaNeta" formatValor={formatK} compacto />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="border border-gray-200 rounded-lg p-3">
+              <p className="text-xs font-bold text-gray-800 mb-2">Highlights de la semana</p>
+              <ul className="space-y-1.5 text-[11px] text-gray-600 leading-snug">
+                {reporte.ventas.diaDestacado && (
+                  <li>
+                    <span className="font-semibold">{DIAS[reporte.ventas.diaDestacado.diaSemana]}</span> fue el día de mayor variación en venta
+                    ({reporte.ventas.diaDestacado.diferenciaPct >= 0 ? '+' : ''}{formatMoney(reporte.ventas.diaDestacado.ventaNeta - reporte.ventas.diaDestacado.promedioHistorico)}).
+                  </li>
+                )}
+                {(() => {
+                  const catDestacada = [...reporte.gastos.categorias]
+                    .filter(c => c.promedioSemanal > 0)
+                    .sort((a, b) => Math.abs(b.variacionMonto) - Math.abs(a.variacionMonto))[0]
+                  return catDestacada && (
+                    <li>
+                      Mayor variación de gasto: <span className="font-semibold">{catDestacada.nombre}</span>
+                      {' '}({catDestacada.variacionMonto >= 0 ? '+' : ''}{formatMoney(catDestacada.variacionMonto)}).
+                    </li>
+                  )
+                })()}
+                {plu?.topPositivos[0] && (
+                  <li>Producto que más creció: <span className="font-semibold">{plu.topPositivos[0].nombre}</span> (+{formatMoney(plu.topPositivos[0].variacionMonto)}).</li>
+                )}
+                {plu?.topNegativos[0] && (
+                  <li>Producto que más cayó: <span className="font-semibold">{plu.topNegativos[0].nombre}</span> ({formatMoney(plu.topNegativos[0].variacionMonto)}).</li>
+                )}
+                {reporte.gastos.pagosFuertes[0] && (
+                  <li>Pago más fuerte: <span className="font-semibold">{reporte.gastos.pagosFuertes[0].proveedor}</span> ({formatMoney(reporte.gastos.pagosFuertes[0].monto)}).</li>
+                )}
+                <li>
+                  RH: {reporte.rh.altas.length === 0 && reporte.rh.bajas.length === 0
+                    ? 'sin movimientos esta semana.'
+                    : `${reporte.rh.altas.length} alta(s), ${reporte.rh.bajas.length} baja(s).`}
+                </li>
+              </ul>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-3">
+              <p className="text-xs font-bold text-gray-800 mb-2">Hacia dónde vamos — cierre de {mesLabel}</p>
+              {cierreMes && ventasMes ? (
+                <p className="text-[11px] text-gray-600 leading-snug">
+                  Si el ritmo se mantiene, <span className="font-semibold capitalize">{mesLabel}</span> cerraría con un margen bruto de{' '}
+                  <span className="font-semibold">{formatMoney(margenBrutoMes)}</span> y un margen de operación de{' '}
+                  <span className="font-semibold">{formatMoney(margenOperacionMes)}</span>
+                  {ventaProyectadaMes ? ` (${((margenOperacionMes / ventaProyectadaMes) * 100).toFixed(1)}% de la venta)` : ''}.
+                </p>
+              ) : (
+                <p className="text-[11px] text-gray-400">Sin datos de proyección disponibles.</p>
+              )}
+            </div>
+          </div>
+
+          {plu?.semanaIncompleta && (
+            <p className="text-[9px] text-gray-400">
+              Ventas por PLU actualizadas hasta: {format(new Date(`${plu.fechaCorte}T00:00:00`), "d 'de' MMMM yyyy", { locale: es })} (semana en curso incompleta).
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

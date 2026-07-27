@@ -3,6 +3,6 @@
 @tailwind utilities;
 
 @media print {
-  @page { margin: 14mm; }
+  @page { size: portrait; margin: 12mm; }
   .print-card { break-inside: avoid; }
 }
