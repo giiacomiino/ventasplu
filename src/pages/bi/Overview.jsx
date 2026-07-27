@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, AlertTriangle, Clock, RefreshCw } from 'lucide-react'
+import { ChevronRight, AlertTriangle, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
 import { formatMoney } from '../../utils/formatters'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -173,6 +173,17 @@ export default function BIOverview() {
 
   const ayer = ventas?.ayer
   const mtd = ventas?.mtd
+
+  // Cuántos días de rezago hay entre hoy y el último día con venta
+  // registrada — para saber de un vistazo si la captura está al día,
+  // sin tener que adivinarlo por el monto de "ayer".
+  let diasRezagoVenta = null
+  if (ayer?.fecha) {
+    const hoyMedianoche = new Date(); hoyMedianoche.setHours(0, 0, 0, 0)
+    const fechaAyerMedianoche = new Date(ayer.fecha); fechaAyerMedianoche.setHours(0, 0, 0, 0)
+    diasRezagoVenta = Math.round((hoyMedianoche - fechaAyerMedianoche) / (24 * 60 * 60 * 1000))
+  }
+  const ventaAlDia = diasRezagoVenta != null && diasRezagoVenta <= 1
   const categoriasRiesgo = negocio?.presupuesto?.categorias?.filter(c => (c.porcentajeUtilizado ?? 0) >= 0.9) ?? []
   const pctPresupuesto = negocio?.presupuesto?.totalLimite ? negocio.presupuesto.totalGastoReal / negocio.presupuesto.totalLimite : null
 
@@ -221,6 +232,20 @@ export default function BIOverview() {
           </button>
         }
       />
+
+      {ayer?.fecha && (
+        <div
+          className={`flex items-center gap-2 text-xs font-semibold px-3 py-2.5 rounded-lg border ${
+            ventaAlDia ? 'bg-green-50 border-green-100 text-green-700' : 'bg-amber-50 border-amber-100 text-amber-700'
+          }`}
+        >
+          {ventaAlDia ? <CheckCircle2 size={14} className="flex-shrink-0" /> : <AlertTriangle size={14} className="flex-shrink-0" />}
+          <span>
+            Venta registrada hasta: <span className="capitalize">{format(new Date(ayer.fecha), "EEEE d 'de' MMMM", { locale: es })}</span>
+            {!ventaAlDia && diasRezagoVenta > 0 && ` — ${diasRezagoVenta} día${diasRezagoVenta === 1 ? '' : 's'} de rezago`}
+          </span>
+        </div>
+      )}
 
       {loading && !ventas && <LoadingState>Cargando datos de VURA...</LoadingState>}
       {error && <ErrorState message={error} />}
