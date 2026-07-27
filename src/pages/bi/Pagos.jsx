@@ -15,7 +15,7 @@ export default function BIPagos() {
   }, [])
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -28,7 +28,7 @@ export default function BIPagos() {
 
       {pagos && (
         <>
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <KpiTile label="Total pendiente" value={formatMoney(pagos.totalPendiente)} sub={`${pagos.totalFacturas} facturas`} />
             <KpiTile
               label="Vencido"

@@ -30,7 +30,7 @@ export default function BIRH() {
   }, [])
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -43,7 +43,7 @@ export default function BIRH() {
 
       {rh && (
         <>
-          <div className="grid grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
             <KpiTile label="Headcount activo" value={rh.headcountActivo} />
             <KpiTile
               label="Rotación del año"
@@ -64,7 +64,7 @@ export default function BIRH() {
             *Rotación aproximada: bajas cuyo último cambio de estatus fue este año — Bubble no expone una fecha de baja explícita.
           </p>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <Card>
               <SectionHeader title="Headcount por área" sub="Solo empleados activos" />
               <div>

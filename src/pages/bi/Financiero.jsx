@@ -112,7 +112,7 @@ export default function BIFinanciero() {
   const mesLabel = data ? format(new Date(data.margenes.mes), 'MMMM', { locale: es }) : ''
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -127,7 +127,7 @@ export default function BIFinanciero() {
         <>
           <section>
             <SectionHeader title="Desempeño del año (YTD)" sub="Acumulado del año, comparado contra el mismo periodo del año anterior" />
-            <div className="grid grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
               <KpiTile
                 label="Venta neta YTD"
                 value={formatMoney(data.kpis.ventaNetaYTD)}
@@ -156,7 +156,7 @@ export default function BIFinanciero() {
 
           <section>
             <SectionHeader title="Márgenes" sub={`Utilidad bruta y de operación — ${mesLabel} vs. acumulado del año`} />
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <MargenCard
                 titulo={`Margen bruto · ${mesLabel}`}
                 monto={data.margenes.margenBrutoMes}
@@ -221,7 +221,7 @@ export default function BIFinanciero() {
 
           <section>
             <SectionHeader title="Últimos 3 meses por categoría" sub="Monto, % de la venta neta y variación YoY de cada mes · histórico de BudgetSnapshot" />
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {data.ultimosTresMeses.map(m => <MesColumna key={m.mes} mes={m.mes} categorias={m.categorias} />)}
             </div>
           </section>

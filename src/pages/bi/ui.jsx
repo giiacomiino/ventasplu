@@ -5,7 +5,7 @@ import { GOOD, CRITICAL } from './shared'
 
 export function Card({ children, className = '', padded = true }) {
   return (
-    <div className={`bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(16,24,40,0.04)] ${padded ? 'p-6' : ''} ${className}`}>
+    <div className={`bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(16,24,40,0.04)] ${padded ? 'p-4 sm:p-6' : ''} ${className}`}>
       {children}
     </div>
   )
@@ -13,8 +13,8 @@ export function Card({ children, className = '', padded = true }) {
 
 export function SectionHeader({ title, sub, right }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-5">
-      <div>
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-5">
+      <div className="min-w-0">
         <h2 className="text-base font-bold text-gray-900 tracking-tight">{title}</h2>
         {sub && <p className="text-sm text-gray-400 mt-0.5">{sub}</p>}
       </div>
@@ -25,9 +25,9 @@ export function SectionHeader({ title, sub, right }) {
 
 export function PageHeader({ title, sub, right }) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{title}</h1>
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">{title}</h1>
         {sub && <p className="text-sm text-gray-400 mt-1">{sub}</p>}
       </div>
       {right}

@@ -270,7 +270,7 @@ export default function BIPresupuesto() {
   }, [anio, mes])
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -281,7 +281,7 @@ export default function BIPresupuesto() {
       {loading && <LoadingState>Cargando...</LoadingState>}
       {error && <ErrorState message={error} />}
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {negocio?.presupuesto && (
           <div className="col-span-2">
             <Card padded={false}>
@@ -323,7 +323,7 @@ export default function BIPresupuesto() {
       {tendencias?.porCategoria && (
         <Card>
           <SectionHeader title="Tendencia — top 4 categorías" sub="% del límite mensual usado, mes a mes (histórico de BudgetSnapshot)" />
-          <div className="grid grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
             {tendencias.porCategoria.map(c => (
               <div key={c.nombre}>
                 <p className="text-sm font-bold text-gray-700 mb-2">{c.nombre}</p>

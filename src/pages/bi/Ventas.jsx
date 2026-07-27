@@ -32,7 +32,7 @@ function YoYChart({ serie, promedioGeneral }) {
 
   return (
     <div>
-      <div className="flex gap-3 mb-2">
+      <div className="flex gap-1 sm:gap-3 mb-2">
         {serie.map((s, i) => {
           const yoyPct = s.anterior ? ((s.actual - s.anterior) / s.anterior) * 100 : null
           return (
@@ -91,7 +91,7 @@ function YoYChart({ serie, promedioGeneral }) {
           ))}
         </div>
       </div>
-      <div className="flex gap-3 mt-2">
+      <div className="flex gap-1 sm:gap-3 mt-2">
         {serie.map(s => (
           <div key={s.mes} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{s.mes}</div>
         ))}
@@ -182,7 +182,7 @@ function DiaSemanaChart({ porDiaSemana }) {
 
   return (
     <div>
-      <div className="relative flex items-end gap-4 h-56">
+      <div className="relative flex items-end gap-1 sm:gap-4 h-56">
         {porDiaSemana.map((d, i) => {
           const real = d.promedioReal ?? 0
           const hist = d.promedioHistorico ?? 0
@@ -227,7 +227,7 @@ function DiaSemanaChart({ porDiaSemana }) {
           )
         })}
       </div>
-      <div className="flex gap-4 mt-1.5">
+      <div className="flex gap-1 sm:gap-4 mt-1.5">
         {porDiaSemana.map(d => (
           <div key={d.diaSemana} className="flex-1 text-center text-[10px] text-gray-400 font-medium">
             {DIAS_CORTOS[d.diaSemana]}
@@ -267,7 +267,7 @@ export default function BIVentas() {
   const mtd = data?.mtd
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -290,7 +290,7 @@ export default function BIVentas() {
           <p className="text-sm text-gray-400 mt-1.5">
             vs. promedio histórico de {DIAS[ayer.diaSemana]}: {formatMoney(ayer.promedioVenta)}
           </p>
-          <div className="grid grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-100">
             <div>
               <p className="text-xs text-gray-400 mb-1">Personas</p>
               <p className="text-lg font-bold text-gray-800 tabular-nums">{Math.round(ayer.personas)}</p>
@@ -308,7 +308,7 @@ export default function BIVentas() {
       )}
 
       {mtd && (
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {mtd.esMesActual ? (
             <>
               <KpiTile

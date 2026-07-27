@@ -69,7 +69,7 @@ function TendenciaMargenChart({ serie }) {
   return (
     <div>
       <div className="relative h-64">
-        <div className="absolute inset-0 flex items-end gap-4">
+        <div className="absolute inset-0 flex items-end gap-1 sm:gap-4">
           {serie.map((s, i) => (
             <div key={s.mes} className="flex-1 h-full flex flex-col justify-end items-center relative">
               {s.proyectado && (
@@ -106,7 +106,7 @@ function TendenciaMargenChart({ serie }) {
           ))}
         </div>
       </div>
-      <div className="flex gap-4 mt-1.5">
+      <div className="flex gap-1 sm:gap-4 mt-1.5">
         {serie.map(s => (
           <div key={s.mes} className="flex-1 text-center text-[11px] text-gray-400 font-medium capitalize">
             {format(new Date(`${s.mes}-01T00:00:00`), 'MMM', { locale: es })}
@@ -241,7 +241,7 @@ export default function BITendenciaCierre() {
     : []
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -260,7 +260,7 @@ export default function BITendenciaCierre() {
 
       {cierre && ventas && (
         <>
-          <section className="grid grid-cols-2 gap-5">
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <MargenHero
               label="Margen bruto proyectado"
               valor={margenBruto}
@@ -277,7 +277,7 @@ export default function BITendenciaCierre() {
             />
           </section>
 
-          <section className="grid grid-cols-3 gap-5">
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <KpiTile
               label="Venta neta proyectada"
               value={formatMoney(ventaProyectada)}

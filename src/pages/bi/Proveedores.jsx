@@ -91,7 +91,7 @@ function ProveedorRow({ p, maxMonto }) {
       </button>
 
       {abierto && (
-        <div className="ml-6 mr-1 mb-4 p-4 rounded-xl bg-gray-50/70 grid grid-cols-2 gap-6">
+        <div className="ml-6 mr-1 mb-4 p-4 rounded-xl bg-gray-50/70 grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Tendencia — últimos 12 meses</p>
             <TendenciaProveedor serieMensual={p.serieMensual} />
@@ -138,7 +138,7 @@ export default function BIProveedores() {
   const maxMonto = datos?.proveedores[0]?.monto ?? 0
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -155,7 +155,7 @@ export default function BIProveedores() {
 
       {datos && (
         <>
-          <div className="grid grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
             <KpiTile label="Gasto total (12 meses)" value={formatMoney(datos.totalGastado)} sub={`${datos.totalFacturas} facturas`} />
             <KpiTile label="Proveedores activos" value={datos.totalProveedores.toLocaleString('es-MX')} />
             <KpiTile

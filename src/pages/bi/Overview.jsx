@@ -195,7 +195,7 @@ export default function BIOverview() {
   }
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1700px] mx-auto space-y-6">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1700px] mx-auto space-y-6">
       <PageHeader
         title="Panel de operaciones"
         sub={
@@ -222,7 +222,7 @@ export default function BIOverview() {
       {error && <ErrorState message={error} />}
 
       {/* ── KPI hero row ── */}
-      <div className="grid grid-cols-5 gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
         {ayer && (
           <KpiTile
             label="Venta neta de ayer"
@@ -289,7 +289,7 @@ export default function BIOverview() {
       </div>
 
       {/* ── Ventas + Presupuesto ── */}
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {anual?.serie && (
           <DomainCard
             to="/business-intelligence/ventas"
@@ -336,7 +336,7 @@ export default function BIOverview() {
       </div>
 
       {/* ── Proveedores + Pagos + RH ── */}
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {negocio?.proveedores && (
           <DomainCard to="/business-intelligence/proveedores" titulo="Proveedores" sub={`Top ${Math.min(5, negocio.proveedores.top.length)} por gasto · 30 días`}>
             <div className="space-y-2.5 mb-4">
@@ -431,7 +431,7 @@ export default function BIOverview() {
       </div>
 
       {/* ── Top PLU + Financiero ── */}
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <DomainCard to="/business-intelligence/ventas-plu" titulo="Top PLU" sub="Productos más vendidos · mes en curso">
           {topPlu.length === 0 ? (
             <p className="text-xs text-gray-300 py-4">Cargando...</p>
@@ -454,7 +454,7 @@ export default function BIOverview() {
 
         {financiero && (
           <DomainCard to="/business-intelligence/financiero" titulo="Panorama financiero" sub="Margen bruto · venta neta YTD" span={2}>
-            <div className="grid grid-cols-3 gap-4 items-center py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center py-2">
               <div className="min-w-0 flex flex-col items-center">
                 <SemicircleGauge
                   pct={financiero.margenes.margenBrutoPctMes ?? 0}
@@ -491,7 +491,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        <div className="col-span-3 grid grid-cols-2 gap-6">
+        <div className="col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
           {cierre && (
             <DomainCard
               to="/business-intelligence/tendencia-cierre"

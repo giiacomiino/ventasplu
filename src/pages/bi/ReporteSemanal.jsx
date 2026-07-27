@@ -68,14 +68,14 @@ function SerieDiariaChart({ serie, valorKey, formatValor, compacto = false }) {
 
   return (
     <div>
-      <div className="flex gap-4 mb-2">
+      <div className="flex gap-1 sm:gap-4 mb-2">
         {serie.map((d, i) => (
           <div key={i} className="flex-1 flex justify-center">
             <EtiquetaVariacion real={d[valorKey]} promedio={d.promedioHistorico} formatValor={formatValor} />
           </div>
         ))}
       </div>
-      <div className={`relative flex items-end gap-4 ${compacto ? 'h-20' : 'h-48'}`}>
+      <div className={`relative flex items-end gap-1 sm:gap-4 ${compacto ? 'h-20' : 'h-48'}`}>
         {serie.map((d, i) => {
           const real = d[valorKey]
           const hist = d.promedioHistorico ?? 0
@@ -108,7 +108,7 @@ function SerieDiariaChart({ serie, valorKey, formatValor, compacto = false }) {
           )
         })}
       </div>
-      <div className="flex gap-4 mt-1.5">
+      <div className="flex gap-1 sm:gap-4 mt-1.5">
         {serie.map((d, i) => (
           <div key={i} className="flex-1 text-center">
             <p className="text-[10px] text-gray-400 font-medium">{DIAS_CORTOS[d.diaSemana]}</p>
@@ -243,7 +243,7 @@ export default function BIReporteSemanal() {
     : null
 
   return (
-    <div className="w-full px-8 py-8 max-w-[1600px] mx-auto space-y-8 print:px-2 print:py-4 print:max-w-full">
+    <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8 print:px-2 print:py-4 print:max-w-full">
       <div className="print:hidden">
         <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Business Intelligence
@@ -275,7 +275,7 @@ export default function BIReporteSemanal() {
 
       {reporte && (
         <div className="print:hidden space-y-8">
-          <section className="grid grid-cols-4 gap-5 print-card">
+          <section className="grid grid-cols-2 sm:grid-cols-4 gap-5 print-card">
             <KpiTile
               label="Venta neta de la semana"
               value={formatMoney(reporte.ventas.ventaSemana)}
@@ -374,7 +374,7 @@ export default function BIReporteSemanal() {
                 </p>
               </Card>
 
-              <div className="grid grid-cols-2 gap-5 print-card">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 print-card">
                 <Card padded={false}>
                   <div className="p-6 pb-3">
                     <SectionHeader title="Top 5 — mayor variación positiva" sub="Productos con más crecimiento vs. la semana anterior" />
@@ -516,7 +516,7 @@ export default function BIReporteSemanal() {
                 title={`Hacia dónde vamos — cierre de ${mesLabel}`}
                 sub="Si el ritmo de gasto e ingreso de esta semana se mantiene"
               />
-              <div className="grid grid-cols-2 gap-5 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
                 <KpiTile label="Margen bruto proyectado del mes" value={formatMoney(margenBrutoMes)} />
                 <KpiTile
                   label="Margen de operación proyectado del mes"
