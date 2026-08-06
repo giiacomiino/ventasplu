@@ -81,12 +81,19 @@ Deno.serve(async (req) => {
     // según su % de gasto histórico.
     const histTotalPorCategoria = new Map<string, number>()
     const histPorCategoriaProveedor = new Map<string, number>()
+    // meses distintos (de esos 6) en los que el proveedor facturó algo —
+    // de aquí sale su cadencia real, no solo el promedio.
+    const mesesConFacturaPorCategoriaProveedor = new Map<string, Set<string>>()
     for (const f of historicas) {
       const cat = f['Categoría'] || 'Sin categoría'
       const prov = f.Prooveedor || 'Sin proveedor'
       histTotalPorCategoria.set(cat, (histTotalPorCategoria.get(cat) ?? 0) + (f.MontoSinIVA || 0))
       const key = clave(cat, prov)
       histPorCategoriaProveedor.set(key, (histPorCategoriaProveedor.get(key) ?? 0) + (f.MontoSinIVA || 0))
+      const mesKey = (f.FechaDeIngreso as string).slice(0, 7)
+      const meses = mesesConFacturaPorCategoriaProveedor.get(key) ?? new Set<string>()
+      meses.add(mesKey)
+      mesesConFacturaPorCategoriaProveedor.set(key, meses)
     }
 
     // Mes seleccionado: gasto real y facturas pagadas por proveedor.
@@ -177,6 +184,17 @@ Deno.serve(async (req) => {
           })
         }
 
+        // Cadencia real del proveedor: en cuántos de los últimos 6 meses
+        // facturó algo. Un proveedor trimestral aparece en ~2 de 6 meses,
+        // así que su cadencia es ~3 — comparamos su gasto de los últimos
+        // 3 meses contra 3 meses de presupuesto implícito, no un mes
+        // suelto contra un mes de presupuesto (que es lo que antes hacía
+        // que se viera "excedido" el mes que factura y "vacío" los demás).
+        const mesesConFactura = mesesConFacturaPorCategoriaProveedor.get(key)?.size ?? 0
+        const cadenciaMeses = mesesConFactura > 0 ? Math.min(6, Math.max(1, Math.round(6 / mesesConFactura))) : null
+        const gastoVentana = cadenciaMeses ? serieMensual.slice(-cadenciaMeses).reduce((s, m) => s + m.monto, 0) : gastoActual
+        const impliedBudgetVentana = impliedBudget != null && cadenciaMeses ? impliedBudget * cadenciaMeses : impliedBudget
+
         const facturas = (facturasPorCategoriaProveedor.get(key) ?? [])
           .sort((a, b) => b.fecha.localeCompare(a.fecha))
 
@@ -186,9 +204,12 @@ Deno.serve(async (req) => {
           share,
           impliedBudget,
           gastoActual,
+          cadenciaMeses,
+          gastoVentana,
+          impliedBudgetVentana,
           serieMensual,
           facturas,
-          pct: impliedBudget ? gastoActual / impliedBudget : null,
+          pct: impliedBudgetVentana ? gastoVentana / impliedBudgetVentana : null,
         }
       }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1))
 

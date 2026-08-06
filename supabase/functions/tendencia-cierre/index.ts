@@ -142,6 +142,11 @@ Deno.serve(async (req) => {
     // Histórico: conteo y monto por proveedor, para sacar facturas/mes
     // esperadas y ticket promedio.
     const histPorCategoriaProveedor = new Map<string, { count: number; monto: number }>()
+    // meses distintos con factura (de esos 6) y monto por mes — para
+    // detectar proveedores no mensuales (trimestrales, etc.) y comparar
+    // su gasto contra una ventana del tamaño de su propia cadencia.
+    const mesesConFacturaPorCategoriaProveedor = new Map<string, Set<string>>()
+    const serieMensualHistPorCategoriaProveedor = new Map<string, Map<string, number>>()
     for (const f of historicas) {
       const cat = f['Categoría'] || 'Sin categoría'
       const prov = f.Prooveedor || 'Sin proveedor'
@@ -150,6 +155,15 @@ Deno.serve(async (req) => {
       acc.count += 1
       acc.monto += f.MontoSinIVA || 0
       histPorCategoriaProveedor.set(key, acc)
+
+      const mesKey = (f.FechaDeIngreso as string).slice(0, 7)
+      const meses = mesesConFacturaPorCategoriaProveedor.get(key) ?? new Set<string>()
+      meses.add(mesKey)
+      mesesConFacturaPorCategoriaProveedor.set(key, meses)
+
+      const mapaMeses = serieMensualHistPorCategoriaProveedor.get(key) ?? new Map<string, number>()
+      mapaMeses.set(mesKey, (mapaMeses.get(mesKey) ?? 0) + (f.MontoSinIVA || 0))
+      serieMensualHistPorCategoriaProveedor.set(key, mapaMeses)
     }
 
     // Mes seleccionado: lo que ya nos han facturado (independiente de si
@@ -203,6 +217,24 @@ Deno.serve(async (req) => {
         const share = totalHistoricoCategoria ? hist.monto / totalHistoricoCategoria : null
         const impliedBudget = limiteMes != null && share != null ? limiteMes * share : null
 
+        // Cadencia real: en cuántos de los últimos 6 meses facturó algo.
+        // Un proveedor trimestral (activo en ~2 de 6 meses) no se puede
+        // comparar contra un presupuesto mensual sin que se vea "excedido"
+        // el mes que factura y "vacío" los demás — se compara contra una
+        // ventana del tamaño de su propia cadencia en su lugar.
+        const mesesConFactura = mesesConFacturaPorCategoriaProveedor.get(key)?.size ?? 0
+        const cadenciaMeses = mesesConFactura > 0 ? Math.min(6, Math.max(1, Math.round(6 / mesesConFactura))) : null
+        let gastoVentana = gastoProyectado
+        if (cadenciaMeses && cadenciaMeses > 1) {
+          const mapaMeses = serieMensualHistPorCategoriaProveedor.get(key) ?? new Map<string, number>()
+          for (let i = 1; i < cadenciaMeses; i++) {
+            const d = new Date(Date.UTC(anioSel, mes0Sel - i, 1))
+            const mesKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+            gastoVentana += mapaMeses.get(mesKey) ?? 0
+          }
+        }
+        const impliedBudgetVentana = impliedBudget != null && cadenciaMeses ? impliedBudget * cadenciaMeses : impliedBudget
+
         return {
           nombre: prov,
           facturasRegistradas: registrado.count,
@@ -213,7 +245,10 @@ Deno.serve(async (req) => {
           gastoAdicionalProyectado,
           gastoProyectado,
           impliedBudget,
-          pct: impliedBudget ? gastoProyectado / impliedBudget : null,
+          cadenciaMeses,
+          gastoVentana,
+          impliedBudgetVentana,
+          pct: impliedBudgetVentana ? gastoVentana / impliedBudgetVentana : null,
         }
       }).sort((a, b) => b.gastoProyectado - a.gastoProyectado)
 

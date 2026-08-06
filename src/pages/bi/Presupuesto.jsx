@@ -151,14 +151,28 @@ function ProveedorRolling({ p }) {
           <div className="min-w-0 flex items-center gap-2">
             {abierto ? <ChevronUp size={13} className="text-gray-300 flex-shrink-0" /> : <ChevronDown size={13} className="text-gray-300 flex-shrink-0" />}
             <span className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</span>
+            {p.cadenciaMeses > 1 && (
+              <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 rounded-full px-2 py-0.5 flex-shrink-0 whitespace-nowrap">
+                cada ~{p.cadenciaMeses} meses
+              </span>
+            )}
           </div>
           <EstadoBadge pct={p.pct} size={11} />
         </div>
         <div className="flex items-center gap-3 pl-5 flex-wrap">
           <MiniBar pct={p.pct ?? 0} color={color} />
           <p className="text-xs text-gray-400 min-w-0">
-            {formatMoney(p.gastoActual)} de {p.impliedBudget != null ? formatMoney(p.impliedBudget) : '—'}
-            <span className="text-gray-300"> · {p.share != null ? `${(p.share * 100).toFixed(1)}% hist.` : 'sin historial'}</span>
+            {p.cadenciaMeses > 1 ? (
+              <>
+                {formatMoney(p.gastoVentana)} de {p.impliedBudgetVentana != null ? formatMoney(p.impliedBudgetVentana) : '—'}
+                <span className="text-gray-300"> · últimos {p.cadenciaMeses} meses (no facturación mensual)</span>
+              </>
+            ) : (
+              <>
+                {formatMoney(p.gastoActual)} de {p.impliedBudget != null ? formatMoney(p.impliedBudget) : '—'}
+                <span className="text-gray-300"> · {p.share != null ? `${(p.share * 100).toFixed(1)}% hist.` : 'sin historial'}</span>
+              </>
+            )}
           </p>
         </div>
       </button>

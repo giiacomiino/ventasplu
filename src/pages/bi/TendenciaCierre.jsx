@@ -129,16 +129,26 @@ function ProveedorProyeccion({ p }) {
   return (
     <div className="rounded-lg border border-gray-100 bg-white p-3">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 mb-2">
-        <span className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</span>
+        <div className="min-w-0 flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</span>
+          {p.cadenciaMeses > 1 && (
+            <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 rounded-full px-2 py-0.5 flex-shrink-0 whitespace-nowrap">
+              cada ~{p.cadenciaMeses} meses
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-          <span className="text-sm font-bold text-gray-800 tabular-nums">{formatMoney(p.gastoProyectado)}</span>
+          <span className="text-sm font-bold text-gray-800 tabular-nums">{formatMoney(p.cadenciaMeses > 1 ? p.gastoVentana : p.gastoProyectado)}</span>
           {p.pct != null && <EstadoBadge pct={p.pct} size={10} />}
         </div>
       </div>
-      {p.impliedBudget != null && (
+      {p.impliedBudgetVentana != null && (
         <div className="flex items-center gap-2 mb-2 pl-0">
           <MiniBar pct={p.pct ?? 0} color={color} />
-          <span className="text-xs text-gray-400">de {formatMoney(p.impliedBudget)} implícito (su % histórico del límite)</span>
+          <span className="text-xs text-gray-400">
+            de {formatMoney(p.impliedBudgetVentana)} implícito
+            {p.cadenciaMeses > 1 ? ` (últimos ${p.cadenciaMeses} meses, no facturación mensual)` : ' (su % histórico del límite)'}
+          </span>
         </div>
       )}
       <p className="text-xs text-gray-400 leading-relaxed">
