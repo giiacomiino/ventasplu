@@ -191,6 +191,39 @@ function ProveedorRolling({ p }) {
   )
 }
 
+// Proveedores esporádicos (no mensuales) agrupados y colapsados por
+// default: mezclarlos con los recurrentes en la misma lista hacía que
+// el % de un proveedor mensual normal se viera igual de "sospechoso"
+// que el de uno trimestral — separarlos deja el presupuesto por
+// proveedor recurrente limpio, sin perder la info de los esporádicos
+// para quien sí la quiera revisar.
+function ProveedoresEsporadicos({ proveedores }) {
+  const [abierto, setAbierto] = useState(false)
+  const total = proveedores.reduce((s, p) => s + p.gastoActual, 0)
+
+  return (
+    <div className="mt-4 pt-3 border-t border-gray-200">
+      <button
+        onClick={() => setAbierto(a => !a)}
+        className="w-full flex items-center justify-between gap-3 text-left rounded-lg p-1.5 -m-1.5 hover:bg-gray-100/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
+      >
+        <span className="text-xs font-semibold text-gray-500 flex items-center gap-1.5 min-w-0">
+          {abierto ? <ChevronUp size={12} className="flex-shrink-0" /> : <ChevronDown size={12} className="flex-shrink-0" />}
+          <span className="truncate">
+            {proveedores.length} proveedor{proveedores.length === 1 ? '' : 'es'} esporádico{proveedores.length === 1 ? '' : 's'} (no mensual) · {formatMoney(total)} este mes
+          </span>
+        </span>
+        <span className="text-[10px] text-gray-400 flex-shrink-0 hidden sm:inline">no se miden mes a mes</span>
+      </button>
+      {abierto && (
+        <div className="space-y-2 mt-3">
+          {proveedores.map(p => <ProveedorRolling key={p.nombre} p={p} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CategoriaRow({ c, detalle, cargandoArbol }) {
   const [abierto, setAbierto] = useState(false)
   const { color } = estadoPresupuesto(c.porcentajeUtilizado)
@@ -220,20 +253,25 @@ function CategoriaRow({ c, detalle, cargandoArbol }) {
       {abierto && (
         <div className="ml-6 mr-1 mb-4 p-3 rounded-xl bg-gray-50/70">
           {cargandoArbol && !detalle && <LoadingState>Cargando proveedores...</LoadingState>}
-          {detalle && (
-            <>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
-                Proveedores de esta categoría · reparto según su % histórico (últimos 6 meses)
-              </p>
-              <div className="space-y-2">
-                {detalle.proveedores.length === 0 ? (
-                  <p className="text-xs text-gray-300 py-3">Sin proveedores en el periodo</p>
-                ) : (
-                  detalle.proveedores.map(p => <ProveedorRolling key={p.nombre} p={p} />)
-                )}
-              </div>
-            </>
-          )}
+          {detalle && (() => {
+            const recurrentes = detalle.proveedores.filter(p => p.cadenciaMeses === 1)
+            const esporadicos = detalle.proveedores.filter(p => p.cadenciaMeses !== 1)
+            return (
+              <>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
+                  Proveedores recurrentes de esta categoría · reparto según su % histórico
+                </p>
+                <div className="space-y-2">
+                  {recurrentes.length === 0 ? (
+                    <p className="text-xs text-gray-300 py-3">Sin proveedores recurrentes en el periodo</p>
+                  ) : (
+                    recurrentes.map(p => <ProveedorRolling key={p.nombre} p={p} />)
+                  )}
+                </div>
+                {esporadicos.length > 0 && <ProveedoresEsporadicos proveedores={esporadicos} />}
+              </>
+            )
+          })()}
         </div>
       )}
     </div>

@@ -168,6 +168,33 @@ function ProveedorProyeccion({ p }) {
   )
 }
 
+function ProveedoresEsporadicos({ proveedores }) {
+  const [abierto, setAbierto] = useState(false)
+  const total = proveedores.reduce((s, p) => s + p.gastoProyectado, 0)
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-200">
+      <button
+        onClick={() => setAbierto(a => !a)}
+        className="w-full flex items-center justify-between gap-3 text-left rounded-lg p-1.5 -m-1.5 hover:bg-gray-100/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold-400"
+      >
+        <span className="text-xs font-semibold text-gray-500 flex items-center gap-1.5 min-w-0">
+          {abierto ? <ChevronUp size={12} className="flex-shrink-0" /> : <ChevronDown size={12} className="flex-shrink-0" />}
+          <span className="truncate">
+            {proveedores.length} proveedor{proveedores.length === 1 ? '' : 'es'} esporádico{proveedores.length === 1 ? '' : 's'} (no mensual) · {formatMoney(total)} proyectado
+          </span>
+        </span>
+        <span className="text-[10px] text-gray-400 flex-shrink-0 hidden sm:inline">no se miden mes a mes</span>
+      </button>
+      {abierto && (
+        <div className="space-y-2 mt-3">
+          {proveedores.map(p => <ProveedorProyeccion key={p.nombre} p={p} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CategoriaProyeccion({ c }) {
   const [abierto, setAbierto] = useState(false)
   const { color } = estadoPresupuesto(c.pctProyectado)
@@ -200,15 +227,22 @@ function CategoriaProyeccion({ c }) {
         </div>
       </button>
 
-      {abierto && (
-        <div className="ml-6 mr-1 mb-4 p-3 rounded-xl bg-gray-50/70 space-y-2">
-          {c.proveedores.length === 0 ? (
-            <p className="text-xs text-gray-300 py-3">Sin proveedores en el periodo</p>
-          ) : (
-            c.proveedores.map(p => <ProveedorProyeccion key={p.nombre} p={p} />)
-          )}
-        </div>
-      )}
+      {abierto && (() => {
+        const recurrentes = c.proveedores.filter(p => p.cadenciaMeses === 1)
+        const esporadicos = c.proveedores.filter(p => p.cadenciaMeses !== 1)
+        return (
+          <div className="ml-6 mr-1 mb-4 p-3 rounded-xl bg-gray-50/70">
+            <div className="space-y-2">
+              {recurrentes.length === 0 ? (
+                <p className="text-xs text-gray-300 py-3">Sin proveedores recurrentes en el periodo</p>
+              ) : (
+                recurrentes.map(p => <ProveedorProyeccion key={p.nombre} p={p} />)
+              )}
+            </div>
+            {esporadicos.length > 0 && <ProveedoresEsporadicos proveedores={esporadicos} />}
+          </div>
+        )
+      })()}
     </div>
   )
 }
