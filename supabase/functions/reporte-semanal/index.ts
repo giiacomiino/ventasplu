@@ -183,12 +183,13 @@ Deno.serve(async (req) => {
       const t = new Date(fechaStr).getTime()
       return t >= inicioSemana.getTime() && t <= finSemana.getTime()
     }
+    const nombreEmpleado = (e: any) => e.NombreEmpleado || 'Sin nombre'
     const altas = empleados
       .filter((e: any) => enRango(e.FechaIngreso))
-      .map((e: any) => ({ nombre: e.Nombre || e.NombreCompleto || 'Sin nombre', fecha: e.FechaIngreso }))
+      .map((e: any) => ({ nombre: nombreEmpleado(e), fecha: e.FechaIngreso }))
     const bajas = empleados
-      .filter((e: any) => e.EstatusEmpleado === 'Baja' && enRango(e['Modified Date']))
-      .map((e: any) => ({ nombre: e.Nombre || e.NombreCompleto || 'Sin nombre', fecha: e['Modified Date'] }))
+      .filter((e: any) => e.EstatusEmpleado === 'Baja' && enRango(e.FechaSalida))
+      .map((e: any) => ({ nombre: nombreEmpleado(e), fecha: e.FechaSalida }))
 
     return json({
       lunes: inicioSemana.toISOString(),

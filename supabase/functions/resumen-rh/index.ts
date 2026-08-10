@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const ahora = new Date()
     const inicioAnio = new Date(Date.UTC(ahora.getUTCFullYear(), 0, 1))
     const bajasDelAnio = empleados.filter((e: any) =>
-      e.EstatusEmpleado === 'Baja' && e['Modified Date'] && new Date(e['Modified Date']) >= inicioAnio,
+      e.EstatusEmpleado === 'Baja' && e.FechaSalida && new Date(e.FechaSalida) >= inicioAnio,
     ).length
     const rotacionAnual = headcountActivo > 0 ? bajasDelAnio / headcountActivo : null
 
