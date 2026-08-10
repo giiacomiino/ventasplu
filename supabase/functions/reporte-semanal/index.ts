@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
       inventarioBaseCrudas,
       empleados,
       ventaBaseData,
+      puestosData,
     ] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Categorías', { constraints: JSON.stringify(conOrg()), limit: '100' }),
       bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
@@ -73,11 +74,13 @@ Deno.serve(async (req) => {
         )),
         limit: '100',
       }),
+      bubbleGetAllFast(bubbleUrl, bubbleToken, 'Puestos', conOrg()),
     ])
 
     const tipoPorNombre = new Map(
       categoriasData.response.results.map((c: any) => [c.CategoriaNombre, c.TipoDeCosto]),
     )
+    const puestoPorId = new Map(puestosData.map((p: any) => [p._id, p.NombrePuesto]))
 
     // ── Venta de la semana, por día, vs. promedio histórico de cada día ──
     const promedioPorDia = new Map(promedioDiaData.response.results.map((p: any) => [p.DiaSemana, p.PromedioVenta]))
@@ -184,12 +187,13 @@ Deno.serve(async (req) => {
       return t >= inicioSemana.getTime() && t <= finSemana.getTime()
     }
     const nombreEmpleado = (e: any) => e.NombreEmpleado || 'Sin nombre'
+    const puestoEmpleado = (e: any) => puestoPorId.get(e.Puesto) ?? 'Sin puesto'
     const altas = empleados
       .filter((e: any) => enRango(e.FechaIngreso))
-      .map((e: any) => ({ nombre: nombreEmpleado(e), fecha: e.FechaIngreso }))
+      .map((e: any) => ({ nombre: nombreEmpleado(e), puesto: puestoEmpleado(e), fecha: e.FechaIngreso }))
     const bajas = empleados
       .filter((e: any) => e.EstatusEmpleado === 'Baja' && enRango(e.FechaSalida))
-      .map((e: any) => ({ nombre: nombreEmpleado(e), fecha: e.FechaSalida }))
+      .map((e: any) => ({ nombre: nombreEmpleado(e), puesto: puestoEmpleado(e), fecha: e.FechaSalida }))
 
     return json({
       lunes: inicioSemana.toISOString(),

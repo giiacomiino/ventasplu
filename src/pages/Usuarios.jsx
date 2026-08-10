@@ -99,7 +99,7 @@ export default function Usuarios() {
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400">Nombre</th>
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400">Correo</th>
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400">Rol</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400">Último login</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-400">Última vez en la página</th>
                     <th className="px-4 py-2 w-10" />
                   </tr>
                 </thead>
@@ -118,8 +118,8 @@ export default function Usuarios() {
                         </select>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-gray-400">
-                        {u.last_sign_in_at
-                          ? format(new Date(u.last_sign_in_at), "d MMM yyyy, HH:mm", { locale: es })
+                        {u.last_seen
+                          ? format(new Date(u.last_seen), "d MMM yyyy, HH:mm", { locale: es })
                           : 'Nunca'}
                       </td>
                       <td className="px-4 py-2.5 w-10 text-right">

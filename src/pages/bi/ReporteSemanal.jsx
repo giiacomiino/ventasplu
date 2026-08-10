@@ -496,14 +496,18 @@ export default function BIReporteSemanal() {
                   <div key={`alta-${i}`} className="flex items-center gap-2.5 text-sm">
                     <UserPlus size={15} className="text-green-600 flex-shrink-0" />
                     <span className="font-medium text-gray-700">{e.nombre}</span>
-                    <span className="text-gray-400">— alta el {format(new Date(e.fecha), 'd MMM', { locale: es })}</span>
+                    <span className="text-gray-400">
+                      · {e.puesto} — alta el {format(new Date(e.fecha), 'd MMM', { locale: es })}
+                    </span>
                   </div>
                 ))}
                 {reporte.rh.bajas.map((e, i) => (
                   <div key={`baja-${i}`} className="flex items-center gap-2.5 text-sm">
                     <UserMinus size={15} className="text-red-500 flex-shrink-0" />
                     <span className="font-medium text-gray-700">{e.nombre}</span>
-                    <span className="text-gray-400">— baja el {format(new Date(e.fecha), 'd MMM', { locale: es })}</span>
+                    <span className="text-gray-400">
+                      · {e.puesto} — baja el {format(new Date(e.fecha), 'd MMM', { locale: es })}
+                    </span>
                   </div>
                 ))}
               </div>

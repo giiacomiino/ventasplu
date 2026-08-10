@@ -17,6 +17,10 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       loadProfile(session?.user?.id)
+      // Solo aquí, no en onAuthStateChange: esto corre una vez por carga
+      // real de la página (refresh o apertura), no en cada refresh de
+      // token de la sesión que ya estaba viva.
+      if (session) supabase.functions.invoke('touch-last-seen').catch(() => {})
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
