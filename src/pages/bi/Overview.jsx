@@ -482,31 +482,34 @@ export default function BIOverview() {
             </div>
           </DomainCard>
         )}
+      </div>
 
-        {ritmo && (
-          <DomainCard to="/pagos/ritmo" titulo="Ritmo de gasto" sub={`Día ${ritmo.diaCorte} de ${ritmo.diasDelMes} · gasto real vs. ritmo ideal`}>
-            <div className="flex flex-col gap-2 h-full">
-              <div className="flex items-center gap-3">
-                <Gauge size={22} strokeWidth={1.5} className="text-gray-300 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xl font-bold tabular-nums leading-tight" style={{ color: ritmo.sobreRitmo > 0 ? CRITICAL : GOOD }}>
-                    {ritmo.sobreRitmo > 0 ? '+' : ''}{formatMoney(ritmo.sobreRitmo)}
-                  </p>
-                  <p className="text-xs font-semibold flex items-center gap-1" style={{ color: ritmo.sobreRitmo > 0 ? CRITICAL : GOOD }}>
-                    {ritmo.sobreRitmo > 0 ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
-                    {ritmo.sobreRitmo > 0 ? 'sobre el ritmo ideal' : 'bajo el ritmo ideal'}
-                  </p>
-                </div>
-              </div>
-              <MiniRitmo serie={ritmo.serie} />
-              <div className="flex items-center gap-3 text-[10px] text-gray-400">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded-full bg-[#7a6020]" /> Gasto real</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded-full" style={{ background: '#dbb75c' }} /> Ritmo ideal</span>
+      {ritmo && (
+        <DomainCard to="/pagos/ritmo" titulo="Ritmo de gasto" sub={`Día ${ritmo.diaCorte} de ${ritmo.diasDelMes} · gasto real vs. ritmo ideal`}>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <Gauge size={22} strokeWidth={1.5} className="text-gray-300 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xl font-bold tabular-nums leading-tight whitespace-nowrap" style={{ color: ritmo.sobreRitmo > 0 ? CRITICAL : GOOD }}>
+                  {ritmo.sobreRitmo > 0 ? '+' : ''}{formatMoney(ritmo.sobreRitmo)}
+                </p>
+                <p className="text-xs font-semibold flex items-center gap-1 whitespace-nowrap" style={{ color: ritmo.sobreRitmo > 0 ? CRITICAL : GOOD }}>
+                  {ritmo.sobreRitmo > 0 ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
+                  {ritmo.sobreRitmo > 0 ? 'sobre el ritmo ideal' : 'bajo el ritmo ideal'}
+                </p>
               </div>
             </div>
-          </DomainCard>
-        )}
-      </div>
+            <div className="w-px self-stretch bg-gray-50 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <MiniRitmo serie={ritmo.serie} />
+            </div>
+            <div className="flex flex-col gap-1.5 text-[10px] text-gray-400 flex-shrink-0">
+              <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="w-2.5 h-0.5 rounded-full bg-[#7a6020]" /> Gasto real</span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap"><span className="w-2.5 h-0.5 rounded-full" style={{ background: '#dbb75c' }} /> Ritmo ideal</span>
+            </div>
+          </div>
+        </DomainCard>
+      )}
 
       {/* ── Top PLU + Financiero ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">

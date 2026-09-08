@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { cachedCall } from '../lib/cache'
+
+async function ventasPorSubcategoria(categoria, year, month) {
+  return cachedCall(`ventas_por_subcategoria:${categoria}:${year}:${month}`, async () => {
+    const { data, error } = await supabase.rpc('ventas_por_subcategoria', { p_categoria: categoria, p_year: year, p_month: month })
+    if (error) throw error
+    return data || []
+  })
+}
 
 export function useVentasPlu(selectedMonth) {
   const [bebidas,   setBebidas]   = useState([])
@@ -8,25 +17,29 @@ export function useVentasPlu(selectedMonth) {
   const [error,     setError]     = useState(null)
 
   useEffect(() => {
+    let cancelado = false
     const fetchData = async () => {
       setLoading(true)
       setError(null)
       const year  = selectedMonth.getFullYear()
       const month = selectedMonth.getMonth() + 1
 
-      const [bRes, aRes] = await Promise.all([
-        supabase.rpc('ventas_por_subcategoria', { p_categoria: 'Bebidas',   p_year: year, p_month: month }),
-        supabase.rpc('ventas_por_subcategoria', { p_categoria: 'Alimentos', p_year: year, p_month: month }),
-      ])
-
-      if (bRes.error) setError(bRes.error.message)
-      if (aRes.error) setError(aRes.error.message)
-
-      setBebidas(bRes.data   || [])
-      setAlimentos(aRes.data || [])
-      setLoading(false)
+      try {
+        const [bData, aData] = await Promise.all([
+          ventasPorSubcategoria('Bebidas', year, month),
+          ventasPorSubcategoria('Alimentos', year, month),
+        ])
+        if (cancelado) return
+        setBebidas(bData)
+        setAlimentos(aData)
+      } catch (e) {
+        if (!cancelado) setError(e.message)
+      } finally {
+        if (!cancelado) setLoading(false)
+      }
     }
     fetchData()
+    return () => { cancelado = true }
   }, [selectedMonth])
 
   const calcTotales = (data) => {

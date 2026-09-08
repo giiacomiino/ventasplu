@@ -52,12 +52,21 @@ Deno.serve(async (req) => {
     const { inicio: inicioAnioAntTramo, fin: finAnioAntTramo } = limitesTramo(anio - 1, mes0, diaCorte)
     const { inicio: inicioAnioAntCompleto, fin: finAnioAntCompleto } = limitesMes(anio - 1, mes0)
 
-    const [ventaData, promedioData, selData, mesAnteriorData, anioAnteriorTramoData, anioAnteriorCompletoData] = await Promise.all([
+    const [ventaData, ventaData30, promedioData, selData, mesAnteriorData, anioAnteriorTramoData, anioAnteriorCompletoData] = await Promise.all([
       bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
         constraints: JSON.stringify(conOrg()),
         sort_field: 'DiaDeVenta',
         descending: 'true',
         limit: '14',
+      }),
+      // Para el gráfico de la página de Ventas: últimos 30 días reales
+      // cuando se ve el mes en curso (puede cruzar al mes anterior) — si
+      // no, se usa el mes completo seleccionado (selData, más abajo).
+      bubbleGet(bubbleUrl, bubbleToken, 'Venta', {
+        constraints: JSON.stringify(conOrg()),
+        sort_field: 'DiaDeVenta',
+        descending: 'true',
+        limit: '30',
       }),
       bubbleGet(bubbleUrl, bubbleToken, 'PromedioVentaDiaSemana', {
         constraints: JSON.stringify(conOrg()),
@@ -124,6 +133,27 @@ Deno.serve(async (req) => {
       ticketPromedio: ultimo.TicketPromedio,
     }
 
+    // Serie para el gráfico de la página de Ventas: si se está viendo el
+    // mes en curso, últimos 30 días reales (rolling, puede cruzar al mes
+    // anterior); si es un mes ya cerrado, el mes completo — no tiene
+    // sentido "últimos 30 días" navegando historia.
+    function armarSerie(resultados: any[]) {
+      return [...resultados].reverse().map((v: any) => {
+        const diaSemana = isoWeekday(v.DiaDeVenta)
+        const promedioVenta = promedioPorDia.get(diaSemana) ?? null
+        const diferenciaPct = promedioVenta ? ((v.VentaNeta - promedioVenta) / promedioVenta) * 100 : null
+        return {
+          fecha: v.DiaDeVenta,
+          diaSemana,
+          ventaNeta: v.VentaNeta,
+          promedioVenta,
+          diferenciaPct,
+          buenDia: diferenciaPct != null ? diferenciaPct >= 0 : null,
+        }
+      })
+    }
+    const tendenciaMes = esMesActual ? armarSerie(ventaData30.response.results) : armarSerie(selData.response.results)
+
     // ── Venta del mes seleccionado (parcial si es el mes en curso, cerrada si no) ──
     const ventaNetaSel = sumaVenta(selData.response.results)
     const ventaNetaMesAnterior = sumaVenta(mesAnteriorData.response.results)
@@ -172,6 +202,7 @@ Deno.serve(async (req) => {
     return json({
       ayer,
       tendencia,
+      tendenciaMes,
       mtd: {
         anio,
         mes: mes0 + 1,

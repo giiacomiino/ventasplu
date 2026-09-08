@@ -35,7 +35,7 @@ function GraficaRitmo({ serie, diaCorte, diasDelMes, sobreRitmo }) {
   return (
     <div>
       <div className="relative">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 300 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ aspectRatio: `${W} / ${H}` }}>
           {/* Grid horizontal recesivo */}
           {[0.25, 0.5, 0.75, 1].map(f => (
             <line key={f} x1={PAD_X} x2={W - PAD_X} y1={y(max * f)} y2={y(max * f)} stroke="#f1f0ec" strokeWidth={1} />

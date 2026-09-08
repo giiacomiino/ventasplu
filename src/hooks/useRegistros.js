@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
+import { limpiarCache } from '../lib/cache'
 
 export function useRegistros() {
 
@@ -17,11 +18,13 @@ export function useRegistros() {
     const { error } = await supabase
       .from('ventas_plu')
       .upsert(venta, { onConflict: 'producto_id,fecha' })
+    if (!error) limpiarCache()
     return error
   }
 
   const eliminarRegistro = async (id) => {
     const { error } = await supabase.from('ventas_plu').delete().eq('id', id)
+    if (!error) limpiarCache()
     return error
   }
 

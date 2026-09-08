@@ -5,6 +5,7 @@ import { formatMoney } from '../../utils/formatters'
 import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { supabase } from '../../lib/supabase'
+import { cachedCall } from '../../lib/cache'
 import { llamar, DIAS, GOLD_RAMP, GOOD, CRITICAL } from './shared'
 import { Card, SectionHeader, PageHeader, KpiTile, DeltaPill, MiniBar, Table, Thead, LoadingState, ErrorState, EmptyState } from './ui'
 import { useSemanaSeleccionada } from './useSemanaSeleccionada'
@@ -165,13 +166,15 @@ export default function BIReporteSemanal() {
       // parcialmente capturada, la variación sale artificialmente negativa.
       // Se recorta la comparación al último día con datos disponibles, y se
       // usa ese MISMO corte relativo en la semana anterior.
-      const { data: ultimaFilaConDatos } = await supabase
-        .from('ventas_plu')
-        .select('fecha')
-        .order('fecha', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      const fechaCorte = ultimaFilaConDatos?.fecha ?? domingoStr
+      const fechaCorte = await cachedCall('ventas_plu:ultima_fecha_maybe', async () => {
+        const { data } = await supabase
+          .from('ventas_plu')
+          .select('fecha')
+          .order('fecha', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        return data?.fecha ?? null
+      }) ?? domingoStr
       const finComparacionStr = fechaCorte < domingoStr ? fechaCorte : domingoStr
       const diasIncluidos = Math.max(
         Math.round((new Date(`${finComparacionStr}T00:00:00`) - semana.lunes) / (24 * 60 * 60 * 1000)) + 1,
@@ -180,12 +183,21 @@ export default function BIReporteSemanal() {
       const lunesAntStr = format(addDays(semana.lunes, -7), 'yyyy-MM-dd')
       const finComparacionAntStr = format(addDays(addDays(semana.lunes, -7), diasIncluidos - 1), 'yyyy-MM-dd')
 
-      const [actual, anterior] = await Promise.all([
-        supabase.from('ventas_plu').select('monto, unidades, producto_id, productos(nombre, categoria, subcategoria)')
-          .gte('fecha', semana.lunesStr).lte('fecha', finComparacionStr),
-        supabase.from('ventas_plu').select('monto, unidades, producto_id, productos(nombre, categoria, subcategoria)')
-          .gte('fecha', lunesAntStr).lte('fecha', finComparacionAntStr),
+      const selectVentasPlu = (desde, hasta) => cachedCall(`ventas_plu:rango:${desde}:${hasta}`, async () => {
+        const { data, error } = await supabase
+          .from('ventas_plu')
+          .select('monto, unidades, producto_id, productos(nombre, categoria, subcategoria)')
+          .gte('fecha', desde).lte('fecha', hasta)
+        if (error) throw error
+        return data || []
+      })
+
+      const [datosActual, datosAnterior] = await Promise.all([
+        selectVentasPlu(semana.lunesStr, finComparacionStr),
+        selectVentasPlu(lunesAntStr, finComparacionAntStr),
       ])
+      const actual = { data: datosActual }
+      const anterior = { data: datosAnterior }
 
       const agruparPor = (rows, campo) => {
         const m = new Map()

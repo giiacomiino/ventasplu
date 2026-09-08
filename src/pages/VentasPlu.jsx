@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useVentasPlu } from '../hooks/useVentasPlu'
 import { supabase } from '../lib/supabase'
+import { cachedCall } from '../lib/cache'
 import MonthPicker from '../components/ui/MonthPicker'
 import SubcatModal from '../components/modals/SubcatModal'
 import RegistrarDiaModal   from '../components/modals/RegistrarDiaModal'
@@ -221,13 +222,15 @@ export default function VentasPlu() {
   const [ultimaFecha, setUltimaFecha] = useState(null)
 
   useEffect(() => {
-    supabase
-      .from('ventas_plu')
-      .select('fecha')
-      .order('fecha', { ascending: false })
-      .limit(1)
-      .single()
-      .then(({ data }) => { if (data) setUltimaFecha(data.fecha) })
+    cachedCall('ventas_plu:ultima_fecha', async () => {
+      const { data } = await supabase
+        .from('ventas_plu')
+        .select('fecha')
+        .order('fecha', { ascending: false })
+        .limit(1)
+        .single()
+      return data?.fecha ?? null
+    }).then(fecha => { if (fecha) setUltimaFecha(fecha) })
   }, [])
 
   const { bebidas, alimentos, bTotales, aTotales, loading, error } = useVentasPlu(mes)

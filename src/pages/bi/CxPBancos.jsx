@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, TrendingUp } from 'lucide-react'
 import { formatMoney } from '../../utils/formatters'
 import { llamar } from './shared'
 import { Card, SectionHeader, PageHeader, KpiTile, MiniBar, LoadingState, ErrorState, EmptyState } from './ui'
@@ -51,7 +51,18 @@ export default function BICxPBancos() {
         <Link to="/pagos" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Cuentas por pagar
         </Link>
-        <PageHeader title="Salidas por cuenta" sub="De dónde salió el dinero de lo pagado — no es un saldo bancario real todavía" />
+        <PageHeader
+          title="Salidas por cuenta"
+          sub="De dónde salió el dinero de lo pagado — no es un saldo bancario real todavía"
+          right={
+            <Link
+              to="/pagos/depositos"
+              className="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
+            >
+              <TrendingUp size={14} /> Ver depósitos proyectados
+            </Link>
+          }
+        />
       </div>
 
       {loading && <LoadingState>Cargando...</LoadingState>}

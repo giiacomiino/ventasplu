@@ -63,7 +63,7 @@ export function KpiTile({ label, value, delta, sub }) {
       {(delta || sub) && (
         <div className="flex flex-col gap-1.5 mt-auto pt-1 min-w-0">
           {delta && <div className="flex items-center gap-1.5 flex-wrap">{delta}</div>}
-          {sub && <span className="text-xs text-gray-400 leading-snug">{sub}</span>}
+          {sub && <span className="text-xs text-gray-400 leading-snug tabular-nums">{sub}</span>}
         </div>
       )}
     </Card>

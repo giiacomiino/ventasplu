@@ -36,12 +36,14 @@ function NavLinks({ profile, linkClass, onNavigate }) {
 
   return (
     <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-      <NavLink to="/" end className={linkClass} onClick={onNavigate}>
-        <BarChart2 size={16} /> Ventas por PLU
-      </NavLink>
       {puede('dashboard') && (
         <NavLink to="/dashboard" className={linkClass} onClick={onNavigate}>
           <LayoutDashboard size={16} /> Dashboard
+        </NavLink>
+      )}
+      {puede('ventas_plu') && (
+        <NavLink to="/" end className={linkClass} onClick={onNavigate}>
+          <BarChart2 size={16} /> Ventas por PLU
         </NavLink>
       )}
       {puede('ventas') && (

@@ -351,3 +351,107 @@ UPDATE profiles SET permisos = '{"compras": true, "compras_solo_insumos": true}'
 UPDATE profiles SET permisos = '{"compras": true}'::jsonb WHERE rol = 'pagos';
 
 UPDATE profiles SET rol = 'usuario' WHERE rol IN ('admin', 'rh', 'almacen', 'pagos');
+
+-- "Ventas por PLU" (la página raíz "/") pasa a ser un apartado más con su
+-- propio permiso — antes era visible para cualquier usuario logueado sin
+-- restricción, así que aquí se lo dejamos prendido a todos los que ya
+-- tenían cuenta para no quitarles nada de golpe.
+UPDATE profiles SET permisos = permisos || '{"ventas_plu": true}'::jsonb WHERE rol != 'owner';
+
+-- =============================================
+-- Reporte de venta diaria (Sierra POS) — captura vía drag-and-drop del PDF
+-- "Ventas por Empresa". Arranca igual que facturas/proveedores: tabla
+-- nativa nueva en Supabase; los dashboards que hoy leen `Venta` de Bubble
+-- siguen igual por ahora, la fusión queda para una fase después de validar
+-- el parser con varios días reales.
+-- =============================================
+CREATE TABLE IF NOT EXISTS reportes_venta_diaria (
+  id                   uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  fecha                date NOT NULL UNIQUE,
+  venta_neta           numeric(12,2),
+  iva_pct              numeric(5,2),
+  iva                  numeric(12,2),
+  venta_neta_civa      numeric(12,2),
+  cobrado              numeric(12,2),
+  cambio               numeric(12,2),
+  propina_tc           numeric(12,2),
+  cobrado_neto         numeric(12,2),
+  comprobado           numeric(12,2),
+  total_ingresos       numeric(12,2),
+  clientes_total       integer,
+  prom_cliente         numeric(12,2),
+  cuentas_total        integer,
+  prom_cuenta          numeric(12,2),
+  cancelaciones        numeric(12,2),
+  cortesias_monto      numeric(12,2),
+  entrada_efectivo     numeric(12,2),
+  salida_efectivo      numeric(12,2),
+  archivo_nombre       text,
+  registrado_por       uuid REFERENCES profiles(id),
+  created_at           timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS reportes_venta_diaria_zonas (
+  id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  reporte_id    uuid NOT NULL REFERENCES reportes_venta_diaria(id) ON DELETE CASCADE,
+  zona          text NOT NULL,
+  cantidad      integer,
+  venta         numeric(12,2),
+  pct           numeric(5,2),
+  cortesias     numeric(12,2),
+  clientes      integer,
+  pct_clientes  numeric(5,2),
+  prom_cliente  numeric(12,2),
+  cuentas       integer,
+  pct_cuentas   numeric(5,2),
+  prom_cuenta   numeric(12,2)
+);
+
+CREATE TABLE IF NOT EXISTS reportes_venta_diaria_pagos (
+  id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  reporte_id    uuid NOT NULL REFERENCES reportes_venta_diaria(id) ON DELETE CASCADE,
+  codigo        text,
+  descripcion   text,
+  monto         numeric(12,2),
+  cantidad      integer
+);
+
+CREATE TABLE IF NOT EXISTS reportes_venta_diaria_categorias (
+  id                    uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  reporte_id            uuid NOT NULL REFERENCES reportes_venta_diaria(id) ON DELETE CASCADE,
+  plu                   integer,
+  descripcion           text NOT NULL,
+  vta_pct               numeric(5,2),
+  ventas                numeric(12,2),
+  cantidad              integer,
+  cortesias             numeric(12,2),
+  cort_pct              numeric(5,2),
+  ventas_sin_cortesias  numeric(12,2)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reportes_venta_zonas_reporte ON reportes_venta_diaria_zonas(reporte_id);
+CREATE INDEX IF NOT EXISTS idx_reportes_venta_pagos_reporte ON reportes_venta_diaria_pagos(reporte_id);
+CREATE INDEX IF NOT EXISTS idx_reportes_venta_categorias_reporte ON reportes_venta_diaria_categorias(reporte_id);
+
+ALTER TABLE reportes_venta_diaria_categorias ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE reportes_venta_diaria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reportes_venta_diaria_zonas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reportes_venta_diaria_pagos ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
+-- Config de dispersión bancaria por forma de pago: a qué cuenta cae cada
+-- código de pago del reporte de venta (EFEC MN, VISA/MAS, AMERICAN,
+-- DEBITO...) y cuántos días tarda en verse reflejado en el banco. Se llena
+-- a mano en /pagos/depositos — mientras un código no tenga cuenta
+-- asignada, sus montos salen como "sin configurar" en vez de asumir algo.
+-- =============================================
+CREATE TABLE IF NOT EXISTS formas_pago_config (
+  codigo           text PRIMARY KEY,
+  descripcion      text,
+  cuenta_banco     text,
+  dias_dispersion  integer,
+  updated_at       timestamptz DEFAULT now()
+);
+
+ALTER TABLE formas_pago_config ENABLE ROW LEVEL SECURITY;

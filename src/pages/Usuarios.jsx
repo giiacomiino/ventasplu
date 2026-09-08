@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const APARTADOS = [
+  { key: 'ventas_plu', label: 'Ventas por PLU' },
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'ventas', label: 'Ventas' },
   { key: 'pagos', label: 'Pagos' },
