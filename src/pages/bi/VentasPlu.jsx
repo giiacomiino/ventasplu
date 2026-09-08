@@ -71,8 +71,8 @@ export default function BIVentasPlu() {
   return (
     <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
-        <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
-          <ArrowLeft size={15} /> Business Intelligence
+        <Link to="/ventas" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
+          <ArrowLeft size={15} /> Ventas
         </Link>
         <PageHeader title="Ventas por PLU — Inteligencia" sub="Ranking de productos y movimientos del mes en curso" />
       </div>

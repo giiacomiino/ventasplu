@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGetAllFast, conOrg, requireRole } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGetAllFast, conOrg, requirePermiso } from '../_shared/bubble.ts'
 
 // "Fonda La Trattoria" es un proveedor interno (transferencias entre la
 // misma operación, no gasto real a terceros) — se excluye de todo el
@@ -11,7 +11,7 @@ const PROVEEDOR_EXCLUIDO = 'fonda la trattoria'
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireRole(req, ['owner', 'admin'])
+  const user = await requirePermiso(req, 'proveedores')
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { anio, mes } = await req.json().catch(() => ({}))

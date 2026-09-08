@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, requireRole } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, requirePermiso } from '../_shared/bubble.ts'
 
 // Proyección de cierre de gasto, por categoría → proveedor.
 //
@@ -17,7 +17,7 @@ import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, requ
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireRole(req, ['owner', 'admin'])
+  const user = await requirePermiso(req, ['rh', 'pnl', 'dashboard'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { anio, mes } = await req.json().catch(() => ({}))

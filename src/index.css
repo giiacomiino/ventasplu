@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Modo privacidad: todo el dinero y las cifras en la app usan la clase
+   tabular-nums (para que los dígitos no brinquen de ancho), así que es un
+   único selector confiable para taparlas todas sin tocar cada pantalla.
+   Se revela al pasar el cursor por si necesitas confirmar un número rápido
+   sin desactivar el modo completo. */
+html.ocultar-cifras .tabular-nums {
+  filter: blur(6px);
+  transition: filter 0.15s ease;
+}
+html.ocultar-cifras .tabular-nums:hover {
+  filter: none;
+}
+
 @media print {
   @page { size: portrait; margin: 12mm; }
   .print-card { break-inside: avoid; }

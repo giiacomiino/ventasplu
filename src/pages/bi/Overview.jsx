@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, AlertTriangle, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
+import { ChevronRight, AlertTriangle, CheckCircle2, Clock, RefreshCw, Gauge } from 'lucide-react'
 import { formatMoney } from '../../utils/formatters'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -60,7 +60,7 @@ function VentasChart({ serie, promedioGeneral }) {
             className="absolute left-0 right-0 border-t-2 border-dashed z-10"
             style={{ bottom: `${alturaPromedio}%`, borderColor: '#9ca3af' }}
           >
-            <span className="absolute right-0 -translate-y-1/2 text-[10px] font-bold text-gray-500 bg-white pl-1.5">
+            <span className="absolute right-0 -translate-y-1/2 text-[10px] font-bold text-gray-500 bg-white pl-1.5 tabular-nums">
               Prom. {fmtK(promedioGeneral)}
             </span>
           </div>
@@ -85,12 +85,12 @@ function VentasChart({ serie, promedioGeneral }) {
                     {hover === hk && (
                       <div className="absolute -top-2 -translate-y-full left-1/2 -translate-x-1/2 z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg pointer-events-none">
                         <p className="font-semibold">{s.mes} · {bar.etiqueta}</p>
-                        <p className="text-gray-300">{formatMoney(bar.val)}</p>
+                        <p className="text-gray-300 tabular-nums">{formatMoney(bar.val)}</p>
                       </div>
                     )}
                     {bar.val != null && (
                       <span
-                        className="absolute top-1/2 left-0 right-0 -translate-y-1/2 text-center text-[10px] font-bold whitespace-nowrap"
+                        className="absolute top-1/2 left-0 right-0 -translate-y-1/2 text-center text-[10px] font-bold whitespace-nowrap tabular-nums"
                         style={{ color: bar.text }}
                       >
                         {fmtK(bar.val)}
@@ -118,6 +118,28 @@ function VentasChart({ serie, promedioGeneral }) {
   )
 }
 
+// Mini versión de la gráfica de /pagos/ritmo: solo la silueta (sin ejes ni
+// tooltip), para que la tarjeta del dashboard muestre algo más que un número.
+function MiniRitmo({ serie }) {
+  const W = 200
+  const H = 56
+  const valores = serie.flatMap(d => [d.gastoAcumulado, d.ritmoPresupuesto]).filter(v => v != null)
+  const max = Math.max(...valores, 1) * 1.1
+  const x = dia => ((dia - 1) / Math.max(serie.length - 1, 1)) * W
+  const y = valor => H - (valor / max) * H
+
+  const puntosGasto = serie.filter(d => d.gastoAcumulado != null).map(d => [x(d.dia), y(d.gastoAcumulado)])
+  const puntosPresupuesto = serie.filter(d => d.ritmoPresupuesto != null).map(d => [x(d.dia), y(d.ritmoPresupuesto)])
+  const lineaPath = pts => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-14" preserveAspectRatio="none">
+      {puntosPresupuesto.length > 1 && <path d={lineaPath(puntosPresupuesto)} fill="none" stroke="#dbb75c" strokeWidth={1.5} strokeDasharray="4 3" />}
+      {puntosGasto.length > 1 && <path d={lineaPath(puntosGasto)} fill="none" stroke="#7a6020" strokeWidth={2} />}
+    </svg>
+  )
+}
+
 function estadoBurn(pct) {
   if (pct == null) return GOOD
   if (pct >= 1) return CRITICAL
@@ -134,6 +156,7 @@ export default function BIOverview() {
   const [rh, setRh] = useState(null)
   const [financiero, setFinanciero] = useState(null)
   const [cierre, setCierre] = useState(null)
+  const [ritmo, setRitmo] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [actualizado, setActualizado] = useState(Date.now())
@@ -149,7 +172,8 @@ export default function BIOverview() {
       llamar('resumen-rh'),
       llamar('resumen-financiero'),
       llamar('tendencia-cierre'),
-    ]).then(([r1, r2, r3, r4, r5, r6, r7]) => {
+      llamar('ritmo-gasto'),
+    ]).then(([r1, r2, r3, r4, r5, r6, r7, r8]) => {
       if (r1.status === 'fulfilled') setVentas(r1.value)
       if (r2.status === 'fulfilled') setAnual(r2.value)
       if (r3.status === 'fulfilled') setNegocio(r3.value)
@@ -157,6 +181,7 @@ export default function BIOverview() {
       if (r5.status === 'fulfilled') setRh(r5.value)
       if (r6.status === 'fulfilled') setFinanciero(r6.value)
       if (r7.status === 'fulfilled') setCierre(r7.value)
+      if (r8.status === 'fulfilled') setRitmo(r8.value)
       const err = [r1, r2, r3, r4, r5, r6, r7].find(r => r.status === 'rejected')
       setError(err ? err.reason.message : '')
       setLoading(false)
@@ -312,7 +337,7 @@ export default function BIOverview() {
             label="Headcount activo"
             value={rh.headcountActivo}
             sub="colaboradores"
-            delta={<span className="text-xs font-semibold text-gray-500">Rotación {rh.rotacionAnual != null ? `${(rh.rotacionAnual * 100).toFixed(0)}%` : '—'} anual</span>}
+            delta={<span className="text-xs font-semibold text-gray-500 tabular-nums">Rotación {rh.rotacionAnual != null ? `${(rh.rotacionAnual * 100).toFixed(0)}%` : '—'} anual</span>}
           />
         )}
       </div>
@@ -321,7 +346,7 @@ export default function BIOverview() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {anual?.serie && (
           <DomainCard
-            to="/business-intelligence/ventas"
+            to="/ventas"
             titulo="Ventas"
             sub={`Venta neta promedio mensual · comparativo año anterior${mtd?.proyeccionCierreMes ? ` · proyección de cierre ${formatMoney(mtd.proyeccionCierreMes)}` : ''}`}
             span={2}
@@ -331,7 +356,7 @@ export default function BIOverview() {
         )}
 
         {negocio?.presupuesto && (
-          <DomainCard to="/business-intelligence/presupuesto" titulo="Presupuesto" sub={`Uso vs. límite por categoría · ${format(new Date(negocio.presupuesto.mes), 'MMMM', { locale: es })}`}>
+          <DomainCard to="/presupuesto" titulo="Presupuesto" sub={`Uso vs. límite por categoría · ${format(new Date(negocio.presupuesto.mes), 'MMMM', { locale: es })}`}>
             <div>
               <div className="flex items-center justify-center gap-6 py-1 mb-6">
                 <DonutGauge pct={pctPresupuesto ?? 0} color={estadoBurn(pctPresupuesto)} size={104} stroke={11} />
@@ -367,13 +392,13 @@ export default function BIOverview() {
       {/* ── Proveedores + Pagos + RH ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {negocio?.proveedores && (
-          <DomainCard to="/business-intelligence/proveedores" titulo="Proveedores" sub={`Top ${Math.min(5, negocio.proveedores.top.length)} por gasto · 30 días`}>
+          <DomainCard to="/proveedores" titulo="Proveedores" sub={`Top ${Math.min(5, negocio.proveedores.top.length)} por gasto · 30 días`}>
             <div className="space-y-2.5 mb-4">
               {negocio.proveedores.top.slice(0, 5).map((p, i) => (
                 <div key={p.nombre}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-medium text-gray-700 truncate">{p.nombre}</span>
-                    <span className="font-bold text-gray-800 flex-shrink-0 ml-2">{formatMoney(p.totalGastado)}</span>
+                    <span className="font-bold text-gray-800 flex-shrink-0 ml-2 tabular-nums">{formatMoney(p.totalGastado)}</span>
                   </div>
                   <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${(p.totalGastado / negocio.proveedores.top[0].totalGastado) * 100}%`, background: GOLD_RAMP[i % GOLD_RAMP.length] }} />
@@ -396,7 +421,7 @@ export default function BIOverview() {
         )}
 
         {pagos && (
-          <DomainCard to="/business-intelligence/pagos" titulo="Cuentas por pagar" sub="Urgencia de cobro pendiente">
+          <DomainCard to="/pagos" titulo="Cuentas por pagar" sub="Urgencia de cobro pendiente">
             <p className="text-2xl font-bold text-gray-900 tabular-nums mb-1">{formatMoney(pagos.totalPendiente)}</p>
             <p className="text-xs text-gray-400 mb-4">total por liquidar</p>
             <StackedUrgencyBar
@@ -429,7 +454,7 @@ export default function BIOverview() {
         )}
 
         {rh && (
-          <DomainCard to="/business-intelligence/rh" titulo="Recursos Humanos" sub="Headcount · nómina estimada">
+          <DomainCard to="/rh" titulo="Recursos Humanos" sub="Headcount · nómina estimada">
             <div className="flex items-baseline justify-between mb-4">
               <div>
                 <p className="text-3xl font-bold text-gray-900 tabular-nums">{rh.headcountActivo}</p>
@@ -437,7 +462,7 @@ export default function BIOverview() {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400">Rotación anual</p>
-                <p className="text-lg font-bold text-gray-800">{rh.rotacionAnual != null ? `${(rh.rotacionAnual * 100).toFixed(0)}%` : '—'}</p>
+                <p className="text-lg font-bold text-gray-800 tabular-nums">{rh.rotacionAnual != null ? `${(rh.rotacionAnual * 100).toFixed(0)}%` : '—'}</p>
               </div>
             </div>
             <div className="space-y-2.5 mb-4">
@@ -457,11 +482,35 @@ export default function BIOverview() {
             </div>
           </DomainCard>
         )}
+
+        {ritmo && (
+          <DomainCard to="/pagos/ritmo" titulo="Ritmo de gasto" sub={`Día ${ritmo.diaCorte} de ${ritmo.diasDelMes} · gasto real vs. ritmo ideal`}>
+            <div className="flex flex-col gap-2 h-full">
+              <div className="flex items-center gap-3">
+                <Gauge size={22} strokeWidth={1.5} className="text-gray-300 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xl font-bold tabular-nums leading-tight" style={{ color: ritmo.sobreRitmo > 0 ? CRITICAL : GOOD }}>
+                    {ritmo.sobreRitmo > 0 ? '+' : ''}{formatMoney(ritmo.sobreRitmo)}
+                  </p>
+                  <p className="text-xs font-semibold flex items-center gap-1" style={{ color: ritmo.sobreRitmo > 0 ? CRITICAL : GOOD }}>
+                    {ritmo.sobreRitmo > 0 ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
+                    {ritmo.sobreRitmo > 0 ? 'sobre el ritmo ideal' : 'bajo el ritmo ideal'}
+                  </p>
+                </div>
+              </div>
+              <MiniRitmo serie={ritmo.serie} />
+              <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded-full bg-[#7a6020]" /> Gasto real</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-0.5 rounded-full" style={{ background: '#dbb75c' }} /> Ritmo ideal</span>
+              </div>
+            </div>
+          </DomainCard>
+        )}
       </div>
 
       {/* ── Top PLU + Financiero ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <DomainCard to="/business-intelligence/ventas-plu" titulo="Top PLU" sub="Productos más vendidos · mes en curso">
+        <DomainCard to="/ventas/plu" titulo="Top PLU" sub="Productos más vendidos · mes en curso">
           {topPlu.length === 0 ? (
             <p className="text-xs text-gray-300 py-4">Cargando...</p>
           ) : (
@@ -470,7 +519,7 @@ export default function BIOverview() {
                 <div key={p.id}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-medium text-gray-700 truncate">{p.nombre}</span>
-                    <span className="font-bold text-gray-800 flex-shrink-0 ml-2">{formatMoney(p.monto)}</span>
+                    <span className="font-bold text-gray-800 flex-shrink-0 ml-2 tabular-nums">{formatMoney(p.monto)}</span>
                   </div>
                   <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${(p.monto / topPlu[0].monto) * 100}%`, background: GOLD_RAMP[i % GOLD_RAMP.length] }} />
@@ -482,7 +531,7 @@ export default function BIOverview() {
         </DomainCard>
 
         {financiero && (
-          <DomainCard to="/business-intelligence/financiero" titulo="Panorama financiero" sub="Margen bruto · venta neta YTD" span={2}>
+          <DomainCard to="/pnl" titulo="Panorama financiero" sub="Margen bruto · venta neta YTD" span={2}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center py-2">
               <div className="min-w-0 flex flex-col items-center">
                 <SemicircleGauge
@@ -523,7 +572,7 @@ export default function BIOverview() {
         <div className="col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
           {cierre && (
             <DomainCard
-              to="/business-intelligence/tendencia-cierre"
+              to="/pnl/tendencia-cierre"
               titulo="Tendencia de cierre"
               sub="Cómo vamos a cerrar el mes, no cómo vamos hoy"
             >
@@ -544,7 +593,7 @@ export default function BIOverview() {
           )}
 
           <DomainCard
-            to="/business-intelligence/reporte-semanal"
+            to="/rh/reporte-semanal"
             titulo="Reporte semanal"
             sub="Lunes a domingo — para reportar a dirección"
           >

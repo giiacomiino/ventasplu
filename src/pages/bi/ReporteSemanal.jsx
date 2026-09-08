@@ -245,8 +245,8 @@ export default function BIReporteSemanal() {
   return (
     <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8 print:px-2 print:py-4 print:max-w-full">
       <div className="print:hidden">
-        <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
-          <ArrowLeft size={15} /> Business Intelligence
+        <Link to="/rh" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
+          <ArrowLeft size={15} /> RH
         </Link>
         <PageHeader
           title="Reporte semanal"
@@ -539,7 +539,7 @@ export default function BIReporteSemanal() {
                 de lo esperado según el promedio histórico de cada día
                 {reporte.ventas.ventaSemanaVsPromedioPct != null ? ` (${reporte.ventas.ventaSemanaVsPromedioPct >= 0 ? '+' : ''}${reporte.ventas.ventaSemanaVsPromedioPct.toFixed(1)}%)` : ''}.
               </p>
-              <Link to="/business-intelligence/tendencia-cierre" className="inline-block text-sm font-semibold mt-4 hover:underline" style={{ color: GOLD_RAMP[1] }}>
+              <Link to="/pnl/tendencia-cierre" className="inline-block text-sm font-semibold mt-4 hover:underline" style={{ color: GOLD_RAMP[1] }}>
                 Ver detalle completo de la tendencia de cierre →
               </Link>
             </Card>

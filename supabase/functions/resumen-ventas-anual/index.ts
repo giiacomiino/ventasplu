@@ -1,11 +1,11 @@
-import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso } from '../_shared/bubble.ts'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireRole(req, ['owner', 'admin'])
+  const user = await requirePermiso(req, ['ventas', 'dashboard'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()

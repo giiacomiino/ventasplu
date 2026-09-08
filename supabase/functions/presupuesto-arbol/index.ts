@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, requireRole } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, requirePermiso } from '../_shared/bubble.ts'
 
 // Árbol completo Categoría → Proveedor → Facturas pagadas, en una sola
 // respuesta. Antes cada click en una categoría o proveedor disparaba su
@@ -10,7 +10,7 @@ import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, requ
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireRole(req, ['owner', 'admin'])
+  const user = await requirePermiso(req, ['presupuesto', 'pagos'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { anio, mes } = await req.json().catch(() => ({}))
@@ -123,6 +123,15 @@ Deno.serve(async (req) => {
     // seleccionado): se arma de la unión histórico+mes-actual, que juntos
     // cubren exactamente esa ventana.
     const serieMensualPorCategoriaProveedor = new Map<string, Map<string, number>>()
+    // Cuántas facturas (no solo cuánto monto) cayeron en cada mes — para
+    // poder mostrar la cadencia real de facturación de cada proveedor,
+    // no solo el monto.
+    const facturasPorMesPorCategoriaProveedor = new Map<string, Map<string, number>>()
+    // Detalle de cada factura por mes — para el desglose al hacer clic en
+    // una barra. Útil sobre todo cuando el mismo proveedor aparece repetido
+    // en más de una categoría: aquí se ve exactamente qué facturas (folio,
+    // monto, descripción) cayeron en cada combinación mes/categoría.
+    const detalleFacturasPorMesPorCategoriaProveedor = new Map<string, Map<string, any[]>>()
     for (const f of [...historicas, ...delMes]) {
       const cat = f['Categoría'] || 'Sin categoría'
       const prov = f.Prooveedor || 'Sin proveedor'
@@ -131,6 +140,22 @@ Deno.serve(async (req) => {
       const mapa = serieMensualPorCategoriaProveedor.get(key) ?? new Map<string, number>()
       mapa.set(mesKey, (mapa.get(mesKey) ?? 0) + (f.MontoSinIVA || 0))
       serieMensualPorCategoriaProveedor.set(key, mapa)
+
+      const mapaFacturas = facturasPorMesPorCategoriaProveedor.get(key) ?? new Map<string, number>()
+      mapaFacturas.set(mesKey, (mapaFacturas.get(mesKey) ?? 0) + 1)
+      facturasPorMesPorCategoriaProveedor.set(key, mapaFacturas)
+
+      const mapaDetalle = detalleFacturasPorMesPorCategoriaProveedor.get(key) ?? new Map<string, any[]>()
+      const lista = mapaDetalle.get(mesKey) ?? []
+      lista.push({
+        fecha: f.FechaDeIngreso,
+        monto: f.MontoSinIVA || 0,
+        descripcion: f.Descripcion || '',
+        remision: f.Remision,
+        pagada: f['Pagada?'] === true,
+      })
+      mapaDetalle.set(mesKey, lista)
+      detalleFacturasPorMesPorCategoriaProveedor.set(key, mapaDetalle)
     }
 
     // Mismo cálculo pero un año antes, solo para poder comparar mes a mes
@@ -171,6 +196,8 @@ Deno.serve(async (req) => {
 
         const mapaMeses = serieMensualPorCategoriaProveedor.get(key) ?? new Map<string, number>()
         const mapaMesesAnyoAnt = serieMensualAnyoAntPorCategoriaProveedor.get(key) ?? new Map<string, number>()
+        const mapaMesesFacturas = facturasPorMesPorCategoriaProveedor.get(key) ?? new Map<string, number>()
+        const mapaMesesDetalle = detalleFacturasPorMesPorCategoriaProveedor.get(key) ?? new Map<string, any[]>()
         const serieMensual = []
         for (let i = 5; i >= 0; i--) {
           const d = new Date(Date.UTC(anioSel, mes0Sel - i, 1))
@@ -181,6 +208,8 @@ Deno.serve(async (req) => {
             mes: mesKey,
             monto: mapaMeses.get(mesKey) ?? 0,
             montoAnterior: mapaMesesAnyoAnt.get(mesKeyAnt) ?? 0,
+            facturas: mapaMesesFacturas.get(mesKey) ?? 0,
+            detalle: (mapaMesesDetalle.get(mesKey) ?? []).sort((a, b) => a.fecha.localeCompare(b.fecha)),
           })
         }
 

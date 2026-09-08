@@ -60,8 +60,8 @@ Deno.serve(async (req) => {
   }
 
   if (body.action === 'create') {
-    const { email, password, nombre, rol } = body
-    if (!email || !password || !rol) return json({ error: 'Faltan datos' }, 400)
+    const { email, password, nombre, permisos } = body
+    if (!email || !password) return json({ error: 'Faltan datos' }, 400)
 
     const { data, error } = await admin.auth.admin.createUser({
       email,
@@ -70,9 +70,12 @@ Deno.serve(async (req) => {
     })
     if (error) return json({ error: error.message }, 400)
 
+    // Todo usuario nuevo entra como 'usuario' — su acceso lo define
+    // permisos, no un rol. Solo el owner (asignado a mano en la base) tiene
+    // acceso total incondicional.
     const { error: perr } = await admin
       .from('profiles')
-      .insert({ id: data.user.id, email, nombre, rol })
+      .insert({ id: data.user.id, email, nombre, rol: 'usuario', permisos: permisos ?? {} })
     if (perr) {
       await admin.auth.admin.deleteUser(data.user.id)
       return json({ error: perr.message }, 400)
@@ -81,9 +84,11 @@ Deno.serve(async (req) => {
   }
 
   if (body.action === 'update') {
-    const { id, nombre, rol } = body
+    const { id, nombre, permisos } = body
     if (!id) return json({ error: 'Falta id' }, 400)
-    const { error } = await admin.from('profiles').update({ nombre, rol }).eq('id', id)
+    const cambios: Record<string, unknown> = { nombre }
+    if (permisos !== undefined) cambios.permisos = permisos
+    const { error } = await admin.from('profiles').update(cambios).eq('id', id)
     if (error) return json({ error: error.message }, 400)
     return json({ ok: true })
   }

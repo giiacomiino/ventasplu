@@ -1,23 +1,92 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { BarChart2, Sparkles, Users, LogOut, Menu, X } from 'lucide-react'
+import {
+  BarChart2, Sparkles, Users, LogOut, Menu, X, LayoutDashboard,
+  TrendingUp, CreditCard, ShoppingCart, Building2, PiggyBank, LineChart, UserCog, Eye, EyeOff,
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import vuraLogo from '../assets/vura-logo.png'
 
-function NavLinks({ profile, linkClass, onNavigate }) {
+const CLAVE_OCULTAR = 'vura-ocultar-cifras'
+
+function useOcultarCifras() {
+  const [oculto, setOculto] = useState(() => localStorage.getItem(CLAVE_OCULTAR) === '1')
+  useEffect(() => {
+    document.documentElement.classList.toggle('ocultar-cifras', oculto)
+    localStorage.setItem(CLAVE_OCULTAR, oculto ? '1' : '0')
+  }, [oculto])
+  return [oculto, setOculto]
+}
+
+function BotonPrivacidad({ oculto, onToggle, className = '' }) {
   return (
-    <nav className="flex-1 px-3 space-y-1">
+    <button
+      onClick={onToggle}
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-800 w-full ${className}`}
+    >
+      {oculto ? <EyeOff size={16} /> : <Eye size={16} />}
+      {oculto ? 'Mostrar cifras' : 'Ocultar cifras'}
+    </button>
+  )
+}
+
+function NavLinks({ profile, linkClass, onNavigate }) {
+  const esOwner = profile?.rol === 'owner'
+  const puede = seccion => esOwner || profile?.permisos?.[seccion] === true
+
+  return (
+    <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
       <NavLink to="/" end className={linkClass} onClick={onNavigate}>
         <BarChart2 size={16} /> Ventas por PLU
       </NavLink>
-      {(profile?.rol === 'owner' || profile?.rol === 'admin') && (
+      {puede('dashboard') && (
+        <NavLink to="/dashboard" className={linkClass} onClick={onNavigate}>
+          <LayoutDashboard size={16} /> Dashboard
+        </NavLink>
+      )}
+      {puede('ventas') && (
+        <NavLink to="/ventas" className={linkClass} onClick={onNavigate}>
+          <TrendingUp size={16} /> Ventas
+        </NavLink>
+      )}
+      {puede('pagos') && (
+        <NavLink to="/pagos" className={linkClass} onClick={onNavigate}>
+          <CreditCard size={16} /> Pagos
+        </NavLink>
+      )}
+      {puede('compras') && (
+        <NavLink to="/compras" className={linkClass} onClick={onNavigate}>
+          <ShoppingCart size={16} /> Compras
+        </NavLink>
+      )}
+      {puede('proveedores') && (
+        <NavLink to="/proveedores" className={linkClass} onClick={onNavigate}>
+          <Building2 size={16} /> Proveedores
+        </NavLink>
+      )}
+      {puede('presupuesto') && (
+        <NavLink to="/presupuesto" className={linkClass} onClick={onNavigate}>
+          <PiggyBank size={16} /> Presupuesto
+        </NavLink>
+      )}
+      {puede('rh') && (
+        <NavLink to="/rh" className={linkClass} onClick={onNavigate}>
+          <Users size={16} /> RH
+        </NavLink>
+      )}
+      {puede('pnl') && (
+        <NavLink to="/pnl" className={linkClass} onClick={onNavigate}>
+          <LineChart size={16} /> P&L
+        </NavLink>
+      )}
+      {puede('business_intelligence') && (
         <NavLink to="/business-intelligence" className={linkClass} onClick={onNavigate}>
           <Sparkles size={16} /> Business Intelligence
         </NavLink>
       )}
-      {profile?.rol === 'owner' && (
+      {esOwner && (
         <NavLink to="/usuarios" className={linkClass} onClick={onNavigate}>
-          <Users size={16} /> Gestión de usuarios
+          <UserCog size={16} /> Gestión de usuarios
         </NavLink>
       )}
     </nav>
@@ -27,6 +96,7 @@ function NavLinks({ profile, linkClass, onNavigate }) {
 export default function AppLayout() {
   const { profile, signOut } = useAuth()
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [ocultarCifras, setOcultarCifras] = useOcultarCifras()
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -64,6 +134,9 @@ export default function AppLayout() {
               </button>
             </div>
             <NavLinks profile={profile} linkClass={linkClass} onNavigate={() => setMenuAbierto(false)} />
+            <div className="px-3 py-3 border-t border-gray-100">
+              <BotonPrivacidad oculto={ocultarCifras} onToggle={() => setOcultarCifras(o => !o)} />
+            </div>
             <div className="px-3 py-4 border-t border-gray-100">
               <p className="px-3 text-xs text-gray-400 truncate mb-2">{profile?.nombre || profile?.email}</p>
               <button
@@ -88,6 +161,10 @@ export default function AppLayout() {
         </div>
 
         <NavLinks profile={profile} linkClass={linkClass} />
+
+        <div className="px-3 py-3 border-t border-gray-100">
+          <BotonPrivacidad oculto={ocultarCifras} onToggle={() => setOcultarCifras(o => !o)} />
+        </div>
 
         <div className="px-3 py-4 border-t border-gray-100">
           <p className="px-3 text-xs text-gray-400 truncate mb-2">

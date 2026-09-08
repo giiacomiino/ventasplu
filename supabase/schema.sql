@@ -262,3 +262,92 @@ INSERT INTO productos (nombre, subcategoria, categoria) VALUES
 ('Pescado Empanizado',     'Pescado',     'Alimentos'),
 ('Pescado Romina',         'Pescado',     'Alimentos')
 ON CONFLICT DO NOTHING;
+
+-- =============================================
+-- TABLA: facturas (CxP nativo de VURA BI)
+-- Arranque de la migración de Pagos fuera de Bubble: SOLO facturas nuevas
+-- registradas desde aquí en adelante viven en esta tabla. Lo histórico
+-- sigue viniendo de Bubble como solo-lectura hasta el corte completo — no
+-- se escribe de vuelta a Bubble desde esta app.
+-- =============================================
+CREATE TABLE IF NOT EXISTS facturas (
+  id                   uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  remision             text NOT NULL,
+  proveedor            text NOT NULL,
+  categoria            text NOT NULL,
+  tipo_producto        text,
+  monto_sin_iva        numeric(12,2) NOT NULL CHECK (monto_sin_iva >= 0),
+  descripcion          text,
+  fecha_ingreso        date NOT NULL,
+  dias_credito         integer,
+  fecha_pago_calculada date,
+  pagada               boolean NOT NULL DEFAULT false,
+  fecha_pago_real      date,
+  cuenta_pago          text,
+  registrada_por       uuid REFERENCES profiles(id),
+  pagada_por           uuid REFERENCES profiles(id),
+  created_at           timestamptz DEFAULT now(),
+  updated_at           timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_facturas_pagada    ON facturas(pagada);
+CREATE INDEX IF NOT EXISTS idx_facturas_proveedor ON facturas(proveedor);
+
+-- RLS activado sin políticas: igual que el resto de la app, todo el acceso
+-- pasa por Edge Functions con service role que validan el rol a mano
+-- (ver crear-factura, marcar-pagada-nativa) — no acceso directo por RLS.
+ALTER TABLE facturas ENABLE ROW LEVEL SECURITY;
+
+-- Consecutivo global de remisión para facturas nativas de VURA BI — lo
+-- comparten Almacén y Pagos, nunca se repite un número.
+CREATE SEQUENCE IF NOT EXISTS facturas_remision_seq START 1;
+
+CREATE OR REPLACE FUNCTION siguiente_remision()
+RETURNS bigint
+LANGUAGE sql
+AS $$ SELECT nextval('facturas_remision_seq') $$;
+
+-- =============================================
+-- TABLA: proveedores (catálogo nativo de VURA BI)
+-- Arranque de la migración del catálogo de proveedores fuera de Bubble.
+-- Categoría y tipo de producto se van "aprendiendo": la primera vez que se
+-- registra una factura de un proveedor nuevo, se guardan aquí como
+-- sugerencia para la próxima. Días de crédito se sincroniza desde Bubble
+-- (ver sync-proveedores-bubble) mientras esa sigue siendo la fuente real.
+-- =============================================
+CREATE TABLE IF NOT EXISTS proveedores (
+  id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  nombre        text NOT NULL UNIQUE,
+  categoria     text,
+  tipo_producto text,
+  dias_credito  integer,
+  created_at    timestamptz DEFAULT now(),
+  updated_at    timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_proveedores_categoria ON proveedores(categoria);
+
+ALTER TABLE proveedores ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
+-- Permisos por apartado (reemplaza los roles fijos admin/rh/almacen/pagos)
+-- El owner sigue siendo owner y siempre tiene acceso total. Todos los
+-- demás pasan a rol 'usuario' y su acceso lo define este jsonb, que el
+-- owner edita con checkboxes en Gestión de usuarios.
+-- =============================================
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS permisos jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+UPDATE profiles SET permisos = '{
+  "dashboard": true, "ventas": true, "pagos": true, "compras": true,
+  "proveedores": true, "presupuesto": true, "rh": true, "pnl": true,
+  "business_intelligence": true
+}'::jsonb WHERE rol = 'admin';
+
+UPDATE profiles SET permisos = '{"rh": true}'::jsonb WHERE rol = 'rh';
+
+UPDATE profiles SET permisos = '{"compras": true, "compras_solo_insumos": true}'::jsonb
+  WHERE rol = 'almacen';
+
+UPDATE profiles SET permisos = '{"compras": true}'::jsonb WHERE rol = 'pagos';
+
+UPDATE profiles SET rol = 'usuario' WHERE rol IN ('admin', 'rh', 'almacen', 'pagos');

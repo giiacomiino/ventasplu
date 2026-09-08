@@ -114,8 +114,8 @@ export default function BIFinanciero() {
   return (
     <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
-        <Link to="/business-intelligence" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
-          <ArrowLeft size={15} /> Business Intelligence
+        <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-gray-700 mb-3 transition-colors">
+          <ArrowLeft size={15} /> Dashboard
         </Link>
         <PageHeader title="Panorama financiero" sub="KPIs YTD, márgenes y estructura de gasto de La Trattoria" right={<SelectorMes />} />
       </div>

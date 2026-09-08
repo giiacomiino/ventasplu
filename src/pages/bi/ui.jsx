@@ -42,7 +42,7 @@ export function DeltaPill({ pct, suffix = '', invert = false, compact = false })
   const bueno = invert ? pct < 0 : pct >= 0
   return (
     <span
-      className={`inline-flex items-center flex-shrink-0 gap-1 font-bold rounded-full whitespace-nowrap ${
+      className={`inline-flex items-center flex-shrink-0 gap-1 font-bold rounded-full whitespace-nowrap tabular-nums ${
         compact ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1'
       }`}
       style={{ color: bueno ? GOOD : CRITICAL, background: bueno ? '#f0fdf4' : '#fef2f2' }}
@@ -135,7 +135,7 @@ export function DonutGauge({ pct, color, size = 96, stroke = 10, label }) {
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
         style={{ transition: 'stroke-dashoffset 0.4s ease' }}
       />
-      <text x="50%" y={label ? '46%' : '50%'} textAnchor="middle" dominantBaseline="central" fontSize={size * 0.22} fontWeight="700" fill="#111827">
+      <text className="tabular-nums" x="50%" y={label ? '46%' : '50%'} textAnchor="middle" dominantBaseline="central" fontSize={size * 0.22} fontWeight="700" fill="#111827">
         {Math.round(clamped * 100)}%
       </text>
       {label && (
@@ -176,7 +176,7 @@ export function SemicircleGauge({ pct, target, color, size = 160 }) {
           stroke="#374151" strokeWidth={2.5}
         />
       )}
-      <text x="50%" y={cy - 4} textAnchor="middle" fontSize={size * 0.19} fontWeight="700" fill="#111827">
+      <text className="tabular-nums" x="50%" y={cy - 4} textAnchor="middle" fontSize={size * 0.19} fontWeight="700" fill="#111827">
         {Math.round(clamped * 100)}%
       </text>
     </svg>
@@ -194,7 +194,7 @@ export function StackedUrgencyBar({ segments }) {
             <div key={i} className="relative flex items-center justify-center" style={{ width: `${pct}%`, background: s.color }}>
               {pct >= 12 && s.value > 0 && (
                 <span
-                  className="text-xs font-bold whitespace-nowrap px-1 truncate"
+                  className="text-xs font-bold whitespace-nowrap px-1 truncate tabular-nums"
                   style={{ color: s.labelColor || '#ffffff' }}
                 >
                   {s.amountLabel}

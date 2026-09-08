@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, conOrg, isoWeekday, requireRole } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, conOrg, isoWeekday, requirePermiso } from '../_shared/bubble.ts'
 
 function sumaVenta(results: any[]) {
   return results.reduce((s, v) => s + (v.VentaNeta || 0), 0)
@@ -25,7 +25,7 @@ function mesAnterior0(anio: number, mes0: number) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requireRole(req, ['owner', 'admin'])
+  const user = await requirePermiso(req, ['rh', 'pnl', 'ventas', 'dashboard'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { bubbleUrl, bubbleToken } = bubbleEnv()

@@ -137,7 +137,41 @@ export async function requireRole(req: Request, roles: string[]) {
   if (!user) return null
 
   const { data: profile } = await admin.from('profiles').select('rol').eq('id', user.id).single()
-  return profile && roles.includes(profile.rol) ? user : null
+  return profile && roles.includes(profile.rol) ? { ...user, rol: profile.rol } : null
+}
+
+// Control de acceso por apartado: profiles.permisos es un jsonb con un
+// booleano por sección ({ pagos: true, compras: true, ... }). El owner
+// siempre pasa sin importar lo que tenga marcado — es el único que puede
+// asignar permisos, así que nunca debe poder bloquearse a sí mismo.
+// `seccion` puede ser un string o un arreglo (basta con tener acceso a
+// una) para funciones que alimentan más de una página con distinto permiso.
+export async function requirePermiso(req: Request, seccion: string | string[]) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) return null
+
+  const admin = createClient(supabaseUrl, serviceKey)
+  const caller = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  })
+
+  const { data: { user } } = await caller.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await admin.from('profiles').select('rol, permisos').eq('id', user.id).single()
+  if (!profile) return null
+
+  const permisos = profile.permisos ?? {}
+  if (profile.rol !== 'owner') {
+    const secciones = Array.isArray(seccion) ? seccion : [seccion]
+    if (!secciones.some(s => permisos[s] === true)) return null
+  }
+
+  return { ...user, rol: profile.rol, permisos }
 }
 
 export function bubbleEnv() {
@@ -145,4 +179,25 @@ export function bubbleEnv() {
     bubbleUrl: Deno.env.get('BUBBLE_API_URL')!,
     bubbleToken: Deno.env.get('BUBBLE_API_TOKEN')!,
   }
+}
+
+// Fecha de pago = ingreso + días de crédito del proveedor, recorrida 2 días
+// atrás si cae en sábado o domingo. Usado tanto para leer facturas de
+// Bubble (pagos-cxp) como para calcular la de una factura nueva nativa
+// (crear-factura) — misma fórmula en los dos lados.
+export function ajustarFinDeSemana(fecha: Date): Date {
+  const dia = fecha.getUTCDay() // 0=domingo ... 6=sábado
+  if (dia === 6 || dia === 0) {
+    const ajustada = new Date(fecha)
+    ajustada.setUTCDate(ajustada.getUTCDate() - 2)
+    return ajustada
+  }
+  return fecha
+}
+
+export function calcularFechaPago(fechaIngresoISO: string, diasCredito: number | null): string | null {
+  if (diasCredito == null || !fechaIngresoISO) return null
+  const base = new Date(fechaIngresoISO)
+  base.setUTCDate(base.getUTCDate() + diasCredito)
+  return ajustarFinDeSemana(base).toISOString()
 }
