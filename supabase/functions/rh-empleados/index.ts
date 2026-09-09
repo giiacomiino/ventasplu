@@ -48,21 +48,22 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === 'crear') {
-      const { nombre, area, puesto, sueldoDiario, fechaIngreso } = body
+      const { nombre, area, puesto, sueldoDiario, fechaIngreso, nss } = body
       if (!nombre || !area || !puesto || sueldoDiario == null || !fechaIngreso) {
         return json({ error: 'Faltan datos' }, 400)
       }
-      const { error } = await admin.from('empleados_nativos').insert({
+      const { data, error } = await admin.from('empleados_nativos').insert({
         nombre,
         area,
         puesto,
         sueldo_diario: Number(sueldoDiario),
         fecha_ingreso: fechaIngreso,
+        nss: nss || null,
         estatus: 'Activo',
         registrado_por: user.id,
-      })
+      }).select('numero_colaborador').single()
       if (error) return json({ error: error.message }, 400)
-      return json({ ok: true })
+      return json({ ok: true, numeroColaborador: data.numero_colaborador })
     }
 
     return json({ error: 'Acción no reconocida' }, 400)

@@ -521,3 +521,10 @@ CREATE TABLE IF NOT EXISTS empleados_nativos (
 );
 
 ALTER TABLE empleados_nativos ENABLE ROW LEVEL SECURITY;
+
+-- Número de colaborador consecutivo (propio de VURA BI, no continúa la
+-- numeración de Bubble — son sistemas separados) y NSS, igual que el
+-- popup de alta de Bubble.
+CREATE SEQUENCE IF NOT EXISTS empleados_numero_seq START 1;
+ALTER TABLE empleados_nativos ADD COLUMN IF NOT EXISTS numero_colaborador integer NOT NULL DEFAULT nextval('empleados_numero_seq');
+ALTER TABLE empleados_nativos ADD COLUMN IF NOT EXISTS nss text;

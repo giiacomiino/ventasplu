@@ -224,15 +224,29 @@ function ModalRegistrarPago({ onClose, onGuardado }) {
   )
 }
 
+function CampoCard({ label, children, hint }) {
+  return (
+    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+      <p className="text-[13px] font-bold text-gray-800 text-center mb-1">{label}</p>
+      {children}
+      {hint && <p className="text-[11px] text-gray-400 text-center mt-1">{hint}</p>}
+    </div>
+  )
+}
+
+const inputCampo = 'w-full bg-transparent text-center text-sm text-gray-700 placeholder-gray-300 focus:outline-none'
+
 function ModalRegistrarEmpleado({ onClose, onGuardado }) {
   const [catalogos, setCatalogos] = useState(null)
   const [nombre, setNombre] = useState('')
+  const [nss, setNss] = useState('')
   const [area, setArea] = useState('')
   const [puesto, setPuesto] = useState('')
   const [fechaIngreso, setFechaIngreso] = useState(new Date().toISOString().slice(0, 10))
   const [sueldoDiario, setSueldoDiario] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [creado, setCreado] = useState(null)
 
   useEffect(() => {
     supabase.functions.invoke('rh-empleados', { body: { action: 'catalogos' } })
@@ -254,58 +268,74 @@ function ModalRegistrarEmpleado({ onClose, onGuardado }) {
     setGuardando(true)
     setError('')
     try {
-      const { error } = await supabase.functions.invoke('rh-empleados', {
-        body: { action: 'crear', nombre: nombre.trim(), area: area.trim(), puesto: puesto.trim(), sueldoDiario: Number(sueldoDiario), fechaIngreso },
+      const { data, error } = await supabase.functions.invoke('rh-empleados', {
+        body: { action: 'crear', nombre: nombre.trim(), area: area.trim(), puesto: puesto.trim(), sueldoDiario: Number(sueldoDiario), fechaIngreso, nss: nss.trim() },
       })
       if (error) throw new Error(error.message)
       refrescarBI()
-      onGuardado()
+      setCreado(data.numeroColaborador)
     } catch (e) {
       setError(e.message)
     }
     setGuardando(false)
   }
 
+  if (creado != null) {
+    return (
+      <Modal onClose={onGuardado} maxWidth="max-w-sm">
+        <div className="p-8 text-center">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `${GOOD}14` }}>
+            <Users size={24} style={{ color: GOOD }} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">Empleado registrado</h3>
+          <p className="text-sm text-gray-500 mt-1">Colaborador #{creado} · {nombre.trim()}</p>
+          <button onClick={onGuardado} className="mt-6 w-full px-4 py-2.5 rounded-full text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718]">
+            Listo
+          </button>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
     <Modal onClose={onClose} maxWidth="max-w-2xl">
       <div className="p-6 max-h-[85vh] overflow-y-auto">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Registrar nuevo empleado</h3>
+        <h3 className="text-xl font-bold text-gray-900 text-center mb-5">Nuevo Colaborador</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre completo</label>
-              <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Apellido Apellido Nombre" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Área</label>
-              <input list="rh-areas-existentes" value={area} onChange={e => setArea(e.target.value)} placeholder="Cocina, Comedor..." className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+          <div className="space-y-3">
+            <CampoCard label="Nombre Completo">
+              <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Escribe su nombre" className={inputCampo} />
+            </CampoCard>
+            <CampoCard label="Número Seguro Social" hint="Opcional">
+              <input value={nss} onChange={e => setNss(e.target.value)} placeholder="NSS" className={inputCampo} />
+            </CampoCard>
+            <CampoCard label="Fecha Ingreso">
+              <input type="date" value={fechaIngreso} onChange={e => setFechaIngreso(e.target.value)} className={inputCampo} />
+            </CampoCard>
+            <CampoCard label="Área" hint="Escribe para agregar una nueva">
+              <input list="rh-areas-existentes" value={area} onChange={e => setArea(e.target.value)} placeholder="Escoge el área" className={inputCampo} />
               <datalist id="rh-areas-existentes">
                 {catalogos?.areas?.map(a => <option key={a} value={a} />)}
               </datalist>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Puesto</label>
+            </CampoCard>
+            <CampoCard label="Puesto" hint="Escribe para agregar uno nuevo">
               <input
                 list="rh-puestos-existentes" value={puesto}
                 onChange={e => elegirPuesto(e.target.value)}
-                placeholder="Mesero, Cocinero..."
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                placeholder="Escoge el puesto"
+                className={inputCampo}
               />
               <datalist id="rh-puestos-existentes">
                 {catalogos?.puestos?.map(p => <option key={p.nombre} value={p.nombre} />)}
               </datalist>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Fecha de ingreso</label>
-                <input type="date" value={fechaIngreso} onChange={e => setFechaIngreso(e.target.value)} className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sueldo diario</label>
-                <input type="number" value={sueldoDiario} onChange={e => setSueldoDiario(e.target.value)} placeholder="0.00" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums" />
-              </div>
-            </div>
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            </CampoCard>
+            <CampoCard label="Sueldo Diario">
+              <input type="number" value={sueldoDiario} onChange={e => setSueldoDiario(e.target.value)} placeholder="0.00" className={`${inputCampo} tabular-nums`} />
+            </CampoCard>
+            <CampoCard label="Número de Colaborador" hint="Se asigna automático al guardar">
+              <p className="text-center text-sm text-gray-300">###</p>
+            </CampoCard>
+            {error && <p className="text-xs text-red-500 text-center">{error}</p>}
           </div>
 
           <div>
@@ -330,10 +360,9 @@ function ModalRegistrarEmpleado({ onClose, onGuardado }) {
             </div>
           </div>
         </div>
-        <div className="flex gap-2 mt-6">
-          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancelar</button>
-          <button onClick={guardar} disabled={guardando} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718] disabled:opacity-50">
-            {guardando ? 'Guardando...' : 'Guardar'}
+        <div className="flex justify-center mt-6">
+          <button onClick={guardar} disabled={guardando} className="px-8 py-2.5 rounded-full text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718] disabled:opacity-50 inline-flex items-center gap-2">
+            <Plus size={15} /> {guardando ? 'Guardando...' : 'Registrar Nuevo Empleado'}
           </button>
         </div>
       </div>
