@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { startOfWeek, format } from 'date-fns'
-import { ChevronRight, Plus, Users, RefreshCw, Clock, Wallet, TrendingUp } from 'lucide-react'
+import { ChevronRight, Plus, Users, RefreshCw, Clock, TrendingUp } from 'lucide-react'
 import { formatMoney } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import { llamar, GOLD_RAMP, GOOD, WARNING, CRITICAL, refrescarBI } from './shared'
@@ -51,14 +51,24 @@ function TendenciaHCChart({ serie }) {
   const [hover, setHover] = useState(null)
   const W = 1000, H = 260, PAD_X = 10, PAD_TOP = 26, PAD_BOTTOM = 30
 
-  const maxHC = Math.max(...serie.map(s => s.hcActivo), 1) * 1.15
+  // Escala de las barras de HC activo recortada al rango real de la serie
+  // (no desde 0) — así se nota si el promedio de activos sube o baja mes a
+  // mes, en vez de verse todas las barras casi iguales por estar cerca de
+  // un total grande.
+  const valoresHC = serie.map(s => s.hcActivo)
+  const minHCval = Math.min(...valoresHC)
+  const maxHCval = Math.max(...valoresHC)
+  const rangoHC = Math.max(maxHCval - minHCval, 1)
+  const baseHC = Math.max(minHCval - rangoHC * 0.6, 0)
+  const topHC = maxHCval + rangoHC * 0.35
+
   const maxEventos = Math.max(...serie.flatMap(s => [s.altas, s.bajas]), 1) * 1.35
 
   const anchoSlot = (W - PAD_X * 2) / serie.length
   const x = i => PAD_X + anchoSlot * (i + 0.5)
   const anchoBarra = anchoSlot * 0.46
 
-  const yHC = v => H - PAD_BOTTOM - (v / maxHC) * (H - PAD_TOP - PAD_BOTTOM)
+  const yHC = v => H - PAD_BOTTOM - ((v - baseHC) / (topHC - baseHC)) * (H - PAD_TOP - PAD_BOTTOM)
   const yEv = v => H - PAD_BOTTOM - (v / maxEventos) * (H - PAD_TOP - PAD_BOTTOM)
 
   const puntosAltas = serie.map((s, i) => [x(i), yEv(s.altas)])
@@ -213,7 +223,6 @@ function ModalRegistrarPago({ onClose, onGuardado }) {
 
 export default function BIRH() {
   const [rh, setRh] = useState(null)
-  const [nomina, setNomina] = useState(null)
   const [rotacion, setRotacion] = useState(null)
   const [asistencia, setAsistencia] = useState(null)
   const [error, setError] = useState('')
@@ -226,28 +235,18 @@ export default function BIRH() {
     setLoading(true)
     Promise.allSettled([
       llamar('resumen-rh'),
-      supabase.functions.invoke('rh-pagos-nomina', { body: { action: 'list' } }),
       llamar('rh-rotacion'),
       llamar('rh-asistencia', { action: 'list', lunes: lunesStr }),
-    ]).then(([r1, r2, r3, r4]) => {
+    ]).then(([r1, r2, r3]) => {
       if (r1.status === 'fulfilled') setRh(r1.value)
       else setError(r1.reason.message)
-      if (r2.status === 'fulfilled' && !r2.value.error && !r2.value.data?.error) setNomina(r2.value.data)
-      if (r3.status === 'fulfilled') setRotacion(r3.value)
-      if (r4.status === 'fulfilled') setAsistencia(r4.value)
+      if (r2.status === 'fulfilled') setRotacion(r2.value)
+      if (r3.status === 'fulfilled') setAsistencia(r3.value)
       setLoading(false)
     })
   }
 
   useEffect(cargar, [])
-
-  const maxRotacion = rotacion?.areas?.length ? Math.max(...rotacion.areas.map(a => a.rotacion ?? 0), 0.01) : 0.01
-
-  const mesesTranscurridos = new Date().getMonth() + 1
-  const nominaEstimadaYTD = rh ? rh.nominaEstimadaMensual * mesesTranscurridos : 0
-  const pctNominaVsEstimado = nomina && nominaEstimadaYTD > 0
-    ? ((nomina.nominaYtd - nominaEstimadaYTD) / nominaEstimadaYTD) * 100
-    : null
 
   const totalCeldas = asistencia ? asistencia.empleados.length * 7 : 0
   const totalAusencias = asistencia
@@ -275,7 +274,7 @@ export default function BIRH() {
 
       {rh && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
               icono={Users}
               label="Headcount activo"
@@ -299,14 +298,6 @@ export default function BIRH() {
               delta={<DeltaPill pct={rh.comparativas?.antiguedadPromedio?.deltaPct} suffix=" YoY" compact />}
             />
             <MetricCard
-              icono={Wallet}
-              label="Nómina YTD (real)"
-              value={nomina ? formatMoney(nomina.nominaYtd) : '—'}
-              sub={nomina?.ultimoPago ? `último: ${nomina.ultimoPago.fecha}` : 'sin registros aún'}
-              color={GOOD}
-              delta={<DeltaPill pct={pctNominaVsEstimado} suffix=" vs. estimado" invert compact />}
-            />
-            <MetricCard
               icono={TrendingUp}
               label="Nómina estimada / mes"
               value={formatMoney(rh.nominaEstimadaMensual)}
@@ -328,24 +319,14 @@ export default function BIRH() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <DomainCard to="/rh/rotacion" titulo="Rotación por área" sub="Desglose por área, puesto, costo mensual y lista de colaboradores">
               {rotacion?.areas?.length ? (
-                <div className="space-y-3.5">
-                  {rotacion.areas.slice(0, 5).map(a => (
-                    <div key={a.area} className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold tabular-nums"
-                        style={{ background: `${colorRotacion(a.rotacion)}14`, color: colorRotacion(a.rotacion) }}
-                      >
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {rotacion.areas.slice(0, 6).map(a => (
+                    <div key={a.area} className="rounded-xl p-3.5 flex flex-col" style={{ background: `${colorRotacion(a.rotacion)}0d` }}>
+                      <p className="text-[11px] font-semibold text-gray-500 truncate">{a.area}</p>
+                      <p className="text-2xl font-bold tabular-nums mt-1.5 leading-none" style={{ color: colorRotacion(a.rotacion) }}>
                         {a.rotacion != null ? `${Math.round(a.rotacion * 100)}%` : '—'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="font-semibold text-gray-700 truncate">{a.area}</span>
-                          <span className="text-gray-400 tabular-nums flex-shrink-0 ml-2">{a.activos} colab.</span>
-                        </div>
-                        <div className="h-2 bg-gray-50 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${((a.rotacion ?? 0) / maxRotacion) * 100}%`, background: colorRotacion(a.rotacion) }} />
-                        </div>
-                      </div>
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-1.5 tabular-nums">{a.activos} colaboradores</p>
                     </div>
                   ))}
                 </div>
