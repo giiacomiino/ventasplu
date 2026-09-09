@@ -1,38 +1,67 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { GOOD, WARNING, CRITICAL, GOLD_RAMP, refrescarBI } from './shared'
+import { WARNING, CRITICAL, GOLD_RAMP, refrescarBI } from './shared'
 import { Card, PageHeader, KpiTile, LoadingState, ErrorState, EmptyState } from './ui'
 import { useSemanaSeleccionada } from './useSemanaSeleccionada'
 
 const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
-const ESTADOS = [
-  { valor: 'trabajo', label: 'Trabajó', color: GOOD },
+// Sin fila = asistió (default). Al desmarcar el checkbox se guarda como
+// "falta" y se puede afinar a una razón más específica con el selector.
+const RAZONES = [
+  { valor: 'falta', label: 'Falta', color: CRITICAL },
   { valor: 'descanso', label: 'Descanso', color: '#8a94a6' },
   { valor: 'vacaciones', label: 'Vacaciones', color: GOLD_RAMP[1] },
-  { valor: 'falta', label: 'Falta', color: CRITICAL },
   { valor: 'incapacidad', label: 'Incapacidad', color: WARNING },
   { valor: 'permiso', label: 'Permiso', color: '#8a6fbd' },
 ]
 
-function CeldaEstado({ estado, onChange, guardando }) {
-  const cfg = ESTADOS.find(e => e.valor === estado)
+function agruparPorAreaPuesto(empleados) {
+  const porArea = new Map()
+  for (const emp of empleados) {
+    if (!porArea.has(emp.area)) porArea.set(emp.area, new Map())
+    const porPuesto = porArea.get(emp.area)
+    if (!porPuesto.has(emp.puesto)) porPuesto.set(emp.puesto, [])
+    porPuesto.get(emp.puesto).push(emp)
+  }
+  return [...porArea.entries()]
+    .map(([area, porPuesto]) => {
+      const puestos = [...porPuesto.entries()]
+        .map(([puesto, lista]) => ({ puesto, empleados: lista }))
+        .sort((a, b) => b.empleados.length - a.empleados.length)
+      const total = puestos.reduce((s, p) => s + p.empleados.length, 0)
+      return { area, total, puestos }
+    })
+    .sort((a, b) => b.total - a.total)
+}
+
+function CeldaAsistencia({ estado, onChange, guardando }) {
+  const asistio = estado == null
+  const cfg = RAZONES.find(r => r.valor === estado)
+
   return (
-    <select
-      value={estado || ''}
-      disabled={guardando}
-      onChange={e => onChange(e.target.value || null)}
-      className="w-full text-[11px] font-bold text-center rounded-md border-0 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50"
-      style={{
-        background: cfg ? `${cfg.color}22` : '#f3f4f6',
-        color: cfg ? cfg.color : '#9ca3af',
-      }}
-    >
-      <option value="">—</option>
-      {ESTADOS.map(e => <option key={e.valor} value={e.valor}>{e.label}</option>)}
-    </select>
+    <div className="flex flex-col items-center gap-1">
+      <input
+        type="checkbox"
+        checked={asistio}
+        disabled={guardando}
+        onChange={() => onChange(asistio ? 'falta' : null)}
+        className="w-4 h-4 rounded accent-[#7a6020] cursor-pointer disabled:opacity-50"
+      />
+      {!asistio && (
+        <select
+          value={estado}
+          disabled={guardando}
+          onChange={e => onChange(e.target.value)}
+          className="w-full text-[10px] font-bold text-center rounded-md border-0 py-1 cursor-pointer focus:outline-none focus:ring-1 focus:ring-offset-1 disabled:opacity-50"
+          style={{ background: cfg ? `${cfg.color}22` : '#f3f4f6', color: cfg ? cfg.color : '#9ca3af' }}
+        >
+          {RAZONES.map(r => <option key={r.valor} value={r.valor}>{r.label}</option>)}
+        </select>
+      )}
+    </div>
   )
 }
 
@@ -79,6 +108,13 @@ export default function BIRHAsistencia() {
     setGuardandoCelda(null)
   }
 
+  const grupos = agruparPorAreaPuesto(empleados)
+  const totalCeldas = empleados.length * 7
+  const ausencias = resumenSemana
+    ? RAZONES.reduce((s, r) => s + (resumenSemana[r.valor] ?? 0), 0)
+    : 0
+  const asistieron = totalCeldas - ausencias
+
   return (
     <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
       <div>
@@ -87,7 +123,7 @@ export default function BIRHAsistencia() {
         </Link>
         <PageHeader
           title="Asistencia semanal"
-          sub="Trabajó, descanso, vacaciones y ausencias por empleado"
+          sub="Por defecto todos asisten — desmarca un día para registrar la razón"
           right={
             <div className="flex items-center gap-2">
               <button onClick={anterior} className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"><ChevronLeft size={16} /></button>
@@ -103,8 +139,9 @@ export default function BIRHAsistencia() {
 
       {!loading && resumenSemana && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {ESTADOS.map(e => (
-            <KpiTile key={e.valor} label={e.label} value={resumenSemana[e.valor] ?? 0} />
+          <KpiTile label="Asistió" value={asistieron} />
+          {RAZONES.map(r => (
+            <KpiTile key={r.valor} label={r.label} value={resumenSemana[r.valor] ?? 0} />
           ))}
         </div>
       )}
@@ -125,27 +162,44 @@ export default function BIRHAsistencia() {
                 </tr>
               </thead>
               <tbody>
-                {empleados.map(emp => (
-                  <tr key={emp.empleadoBubbleId} className="border-b border-gray-50 last:border-0">
-                    <td className="px-4 py-2 sticky left-0 bg-white">
-                      <p className="font-medium text-gray-700 truncate max-w-[180px]">{emp.nombre}</p>
-                      <p className="text-[11px] text-gray-400 truncate max-w-[180px]">{emp.puesto}</p>
-                    </td>
-                    {emp.dias.map(d => (
-                      <td key={d.fecha} className="px-1.5 py-2">
-                        <CeldaEstado
-                          estado={d.estado}
-                          guardando={guardandoCelda === `${emp.empleadoBubbleId}:${d.fecha}`}
-                          onChange={estado => cambiarEstado(emp, d.fecha, estado)}
-                        />
+                {grupos.map(grupo => (
+                  <Fragment key={`area-${grupo.area}`}>
+                    <tr className="bg-gray-50">
+                      <td colSpan={9} className="px-4 py-2 text-[11px] font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
+                        {grupo.area} · {grupo.total}
                       </td>
+                    </tr>
+                    {grupo.puestos.map(p => (
+                      <Fragment key={`puesto-${grupo.area}-${p.puesto}`}>
+                        <tr>
+                          <td colSpan={9} className="px-6 py-1.5 text-[11px] font-semibold text-gray-400 sticky left-0 bg-white">
+                            {p.puesto}
+                          </td>
+                        </tr>
+                        {p.empleados.map(emp => (
+                          <tr key={emp.empleadoBubbleId} className="border-b border-gray-50 last:border-0">
+                            <td className="pl-9 pr-4 py-2 sticky left-0 bg-white">
+                              <p className="font-medium text-gray-700 truncate max-w-[170px]">{emp.nombre}</p>
+                            </td>
+                            {emp.dias.map(d => (
+                              <td key={d.fecha} className="px-1.5 py-2">
+                                <CeldaAsistencia
+                                  estado={d.estado}
+                                  guardando={guardandoCelda === `${emp.empleadoBubbleId}:${d.fecha}`}
+                                  onChange={estado => cambiarEstado(emp, d.fecha, estado)}
+                                />
+                              </td>
+                            ))}
+                            <td className="px-3 py-2 text-center">
+                              <span className="text-xs font-bold text-gray-600 tabular-nums">
+                                {emp.saldoVacaciones.restantes}/{emp.saldoVacaciones.correspondientes}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
                     ))}
-                    <td className="px-3 py-2 text-center">
-                      <span className="text-xs font-bold text-gray-600 tabular-nums">
-                        {emp.saldoVacaciones.restantes}/{emp.saldoVacaciones.correspondientes}
-                      </span>
-                    </td>
-                  </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
