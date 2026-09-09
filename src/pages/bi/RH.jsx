@@ -25,56 +25,82 @@ function colorRotacion(pct) {
   return GOOD
 }
 
-// Dos ejes independientes: HC activo (izquierda, escala grande) y
-// altas/bajas (derecha, escala chica) — así se distingue el movimiento
-// mes a mes de altas/bajas, que si compartieran eje con el HC total
-// quedarían casi planas.
+// Catmull-Rom a Bézier: suaviza una polilínea de puntos [x,y] sin cambiar
+// los valores reales en cada punto, solo cómo se conectan.
+function pathSuave(puntos) {
+  if (puntos.length < 2) return ''
+  let d = `M ${puntos[0][0].toFixed(1)},${puntos[0][1].toFixed(1)}`
+  for (let i = 0; i < puntos.length - 1; i++) {
+    const p0 = puntos[i === 0 ? i : i - 1]
+    const p1 = puntos[i]
+    const p2 = puntos[i + 1]
+    const p3 = puntos[i + 2 < puntos.length ? i + 2 : i + 1]
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`
+  }
+  return d
+}
+
+// HC activo como barras (nivel del mes, fondo) y altas/bajas como líneas
+// suaves con etiqueta de valor en cada punto — sin ejes ni gridlines, los
+// números se leen directo sobre la gráfica.
 function TendenciaHCChart({ serie }) {
   const [hover, setHover] = useState(null)
-  const W = 1000, H = 260, PAD_L = 34, PAD_R = 34, PAD_TOP = 20, PAD_BOTTOM = 10
+  const W = 1000, H = 260, PAD_X = 10, PAD_TOP = 26, PAD_BOTTOM = 30
 
   const maxHC = Math.max(...serie.map(s => s.hcActivo), 1) * 1.15
-  const maxEventos = Math.max(...serie.flatMap(s => [s.altas, s.bajas]), 1) * 1.2
+  const maxEventos = Math.max(...serie.flatMap(s => [s.altas, s.bajas]), 1) * 1.35
 
-  const x = i => PAD_L + (i / Math.max(serie.length - 1, 1)) * (W - PAD_L - PAD_R)
+  const anchoSlot = (W - PAD_X * 2) / serie.length
+  const x = i => PAD_X + anchoSlot * (i + 0.5)
+  const anchoBarra = anchoSlot * 0.46
+
   const yHC = v => H - PAD_BOTTOM - (v / maxHC) * (H - PAD_TOP - PAD_BOTTOM)
   const yEv = v => H - PAD_BOTTOM - (v / maxEventos) * (H - PAD_TOP - PAD_BOTTOM)
-  const lineaHC = serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${yHC(s.hcActivo).toFixed(1)}`).join(' ')
-  const lineaAltas = serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${yEv(s.altas).toFixed(1)}`).join(' ')
-  const lineaBajas = serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${yEv(s.bajas).toFixed(1)}`).join(' ')
+
+  const puntosAltas = serie.map((s, i) => [x(i), yEv(s.altas)])
+  const puntosBajas = serie.map((s, i) => [x(i), yEv(s.bajas)])
 
   const hoverInfo = hover != null ? serie[hover] : null
-  const niveles = [0.25, 0.5, 0.75, 1]
 
   return (
     <div>
       <div className="relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ aspectRatio: `${W} / ${H}` }}>
-          {niveles.map(f => (
-            <line key={f} x1={PAD_L} x2={W - PAD_R} y1={yHC(maxHC * f)} y2={yHC(maxHC * f)} stroke="#f1f0ec" strokeWidth={1} />
-          ))}
-          {niveles.map(f => (
-            <text key={`l-${f}`} x={PAD_L - 8} y={yHC(maxHC * f)} textAnchor="end" dominantBaseline="middle" fontSize="13" fill={GOLD_RAMP[1]} className="tabular-nums">
-              {Math.round(maxHC * f)}
-            </text>
-          ))}
-          {niveles.map(f => (
-            <text key={`r-${f}`} x={W - PAD_R + 8} y={yEv(maxEventos * f)} textAnchor="start" dominantBaseline="middle" fontSize="13" fill="#9ca3af" className="tabular-nums">
-              {Math.round(maxEventos * f)}
-            </text>
+          {serie.map((s, i) => (
+            <rect
+              key={`bar-${i}`}
+              x={x(i) - anchoBarra / 2} y={yHC(s.hcActivo)}
+              width={anchoBarra} height={Math.max(H - PAD_BOTTOM - yHC(s.hcActivo), 1)}
+              rx={4} fill={GOLD_RAMP[1]} opacity={hover === i ? 0.32 : 0.16}
+            />
           ))}
 
-          <path d={lineaHC} fill="none" stroke={GOLD_RAMP[1]} strokeWidth={2.25} strokeDasharray="7 5" strokeLinecap="round" />
-          <path d={lineaAltas} fill="none" stroke={GOOD} strokeWidth={2} strokeLinecap="round" />
-          <path d={lineaBajas} fill="none" stroke={CRITICAL} strokeWidth={2} strokeLinecap="round" />
+          <path d={pathSuave(puntosAltas)} fill="none" stroke={GOOD} strokeWidth={2.5} strokeLinecap="round" />
+          <path d={pathSuave(puntosBajas)} fill="none" stroke={CRITICAL} strokeWidth={2.5} strokeLinecap="round" />
+
+          {serie.map((s, i) => (
+            <circle key={`ca-${i}`} cx={x(i)} cy={yEv(s.altas)} r={3} fill={GOOD} />
+          ))}
+          {serie.map((s, i) => (
+            <circle key={`cb-${i}`} cx={x(i)} cy={yEv(s.bajas)} r={3} fill={CRITICAL} />
+          ))}
+          {serie.map((s, i) => (
+            <text key={`ta-${i}`} x={x(i)} y={yEv(s.altas) - 9} textAnchor="middle" fontSize="11" fontWeight="700" fill={GOOD} className="tabular-nums">{s.altas}</text>
+          ))}
+          {serie.map((s, i) => (
+            <text key={`tb-${i}`} x={x(i)} y={yEv(s.bajas) + 17} textAnchor="middle" fontSize="11" fontWeight="700" fill={CRITICAL} className="tabular-nums">{s.bajas}</text>
+          ))}
 
           {serie.map((s, i) => (
             <rect
-              key={i} x={x(i) - (W / serie.length) / 2} y={0} width={W / serie.length} height={H} fill="transparent"
+              key={`hit-${i}`} x={x(i) - anchoSlot / 2} y={0} width={anchoSlot} height={H} fill="transparent"
               onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
             />
           ))}
-          {hover != null && <line x1={x(hover)} x2={x(hover)} y1={PAD_TOP} y2={H - PAD_BOTTOM} stroke="#d1d5db" strokeWidth={1} strokeDasharray="3 3" />}
         </svg>
         {hoverInfo && (
           <div
@@ -83,20 +109,18 @@ function TendenciaHCChart({ serie }) {
           >
             <p className="font-semibold">{MESES_CORTOS[hoverInfo.mes]}</p>
             <p className="tabular-nums" style={{ color: '#e3c780' }}>HC activo: {hoverInfo.hcActivo}</p>
-            <p className="tabular-nums" style={{ color: '#86efac' }}>Altas: {hoverInfo.altas}</p>
-            <p className="tabular-nums" style={{ color: '#fca5a5' }}>Bajas: {hoverInfo.bajas}</p>
           </div>
         )}
       </div>
-      <div className="flex mt-2" style={{ paddingLeft: `${(PAD_L / W) * 100}%`, paddingRight: `${(PAD_R / W) * 100}%` }}>
+      <div className="flex mt-1">
         {serie.map((s, i) => (
           <div key={i} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{MESES_CORTOS[s.mes]}</div>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-gray-50 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: GOOD }} /> Altas <span className="text-gray-300">(eje derecho)</span></span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: CRITICAL }} /> Bajas <span className="text-gray-300">(eje derecho)</span></span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full border-t-2 border-dashed" style={{ borderColor: GOLD_RAMP[1] }} /> HC activo <span className="text-gray-300">(eje izquierdo)</span></span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: GOOD }} /> Altas</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: CRITICAL }} /> Bajas</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: `${GOLD_RAMP[1]}30` }} /> HC activo</span>
       </div>
     </div>
   )
@@ -283,20 +307,23 @@ export default function BIRH() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <DomainCard to="/rh/rotacion" titulo="Rotación por área" sub="Desglose por área, puesto, costo mensual y lista de colaboradores">
               {rotacion?.areas?.length ? (
-                <div className="space-y-2.5">
+                <div className="space-y-3.5">
                   {rotacion.areas.slice(0, 5).map(a => (
-                    <div key={a.area}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="font-medium text-gray-700 truncate">{a.area}</span>
-                        <span className="flex items-center gap-2 flex-shrink-0 ml-2">
-                          <span className="text-gray-400 tabular-nums">{a.activos}</span>
-                          <span className="font-bold tabular-nums" style={{ color: colorRotacion(a.rotacion) }}>
-                            {a.rotacion != null ? `${(a.rotacion * 100).toFixed(0)}%` : '—'}
-                          </span>
-                        </span>
+                    <div key={a.area} className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold tabular-nums"
+                        style={{ background: `${colorRotacion(a.rotacion)}14`, color: colorRotacion(a.rotacion) }}
+                      >
+                        {a.rotacion != null ? `${Math.round(a.rotacion * 100)}%` : '—'}
                       </div>
-                      <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${((a.rotacion ?? 0) / maxRotacion) * 100}%`, background: colorRotacion(a.rotacion) }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-semibold text-gray-700 truncate">{a.area}</span>
+                          <span className="text-gray-400 tabular-nums flex-shrink-0 ml-2">{a.activos} colab.</span>
+                        </div>
+                        <div className="h-2 bg-gray-50 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${((a.rotacion ?? 0) / maxRotacion) * 100}%`, background: colorRotacion(a.rotacion) }} />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -308,18 +335,27 @@ export default function BIRH() {
 
             <DomainCard to="/rh/asistencia" titulo="Asistencia semanal" sub="Registra descansos, vacaciones, faltas e incapacidades por empleado">
               {asistencia ? (
-                <div className="flex items-center gap-5">
-                  <DonutGauge pct={pctAsistencia} color={pctAsistencia >= 0.9 ? GOOD : pctAsistencia >= 0.75 ? WARNING : CRITICAL} size={68} stroke={8} label="asistió" />
-                  <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="flex items-center gap-6">
+                  <DonutGauge pct={pctAsistencia} color={pctAsistencia >= 0.9 ? GOOD : pctAsistencia >= 0.75 ? WARNING : CRITICAL} size={84} stroke={9} label="asistió" />
+                  <div className="flex-1 min-w-0">
                     {desgloseAusencias.length === 0 ? (
-                      <p className="text-xs text-gray-400">Sin ausencias registradas esta semana.</p>
-                    ) : desgloseAusencias.map(e => (
-                      <div key={e.valor} className="flex items-center gap-1.5 text-[11px]">
-                        <span className="w-1.5 h-1.5 rounded-sm flex-shrink-0" style={{ background: e.color }} />
-                        <span className="text-gray-600 flex-1">{e.label}</span>
-                        <span className="text-gray-700 font-bold tabular-nums flex-shrink-0">{e.valor2}</span>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${GOOD}14` }}>
+                          <Users size={16} style={{ color: GOOD }} />
+                        </div>
+                        <p className="text-sm font-semibold text-gray-600">Semana completa, sin ausencias</p>
                       </div>
-                    ))}
+                    ) : (
+                      <div className="space-y-2">
+                        {desgloseAusencias.map(e => (
+                          <div key={e.valor} className="flex items-center gap-2 text-xs">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: e.color }} />
+                            <span className="text-gray-600 flex-1">{e.label}</span>
+                            <span className="text-gray-800 font-bold tabular-nums flex-shrink-0">{e.valor2}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
