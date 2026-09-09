@@ -123,6 +123,8 @@ function TendenciaHCChart({ serie }) {
           >
             <p className="font-semibold">{MESES_CORTOS[hoverInfo.mes]}</p>
             <p className="tabular-nums" style={{ color: '#e3c780' }}>HC activo: {hoverInfo.hcActivo}</p>
+            <p className="tabular-nums" style={{ color: '#86efac' }}>Altas: {hoverInfo.altas}</p>
+            <p className="tabular-nums" style={{ color: '#fca5a5' }}>Bajas: {hoverInfo.bajas}</p>
           </div>
         )}
       </div>
