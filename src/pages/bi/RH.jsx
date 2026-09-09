@@ -5,7 +5,7 @@ import { ChevronRight, Plus, Users, RefreshCw, Clock, Wallet, TrendingUp } from 
 import { formatMoney } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import { llamar, GOLD_RAMP, GOOD, WARNING, CRITICAL, refrescarBI } from './shared'
-import { Card, PageHeader, LoadingState, ErrorState, DonutGauge } from './ui'
+import { Card, PageHeader, SectionHeader, LoadingState, ErrorState, DonutGauge } from './ui'
 import Modal from '../../components/ui/Modal'
 
 const AUSENCIAS_ESTILO = [
@@ -16,11 +16,75 @@ const AUSENCIAS_ESTILO = [
   { valor: 'permiso', label: 'Permiso', color: '#8a6fbd' },
 ]
 
+const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
 function colorRotacion(pct) {
   if (pct == null) return '#9ca3af'
   if (pct >= 0.5) return CRITICAL
   if (pct >= 0.25) return '#ec835a'
   return GOOD
+}
+
+// Altas/bajas en verde/rojo sólido (eventos del mes) y HC activo en
+// punteado dorado (el nivel al cierre de cada mes) — mismo eje: las tres
+// series son "número de personas", así que compartirlo no distorsiona
+// nada, solo hace que altas/bajas se vean chicas frente al total de HC.
+function TendenciaHCChart({ serie }) {
+  const [hover, setHover] = useState(null)
+  const W = 1000, H = 260, PAD_X = 8, PAD_TOP = 20, PAD_BOTTOM = 10
+
+  const valores = serie.flatMap(s => [s.altas, s.bajas, s.hcActivo])
+  const max = Math.max(...valores, 1) * 1.12
+
+  const x = i => PAD_X + (i / Math.max(serie.length - 1, 1)) * (W - PAD_X * 2)
+  const y = v => H - PAD_BOTTOM - (v / max) * (H - PAD_TOP - PAD_BOTTOM)
+  const linea = campo => serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(s[campo]).toFixed(1)}`).join(' ')
+
+  const hoverInfo = hover != null ? serie[hover] : null
+
+  return (
+    <div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ aspectRatio: `${W} / ${H}` }}>
+          {[0.25, 0.5, 0.75, 1].map(f => (
+            <line key={f} x1={PAD_X} x2={W - PAD_X} y1={y(max * f)} y2={y(max * f)} stroke="#f1f0ec" strokeWidth={1} />
+          ))}
+          <path d={linea('hcActivo')} fill="none" stroke={GOLD_RAMP[1]} strokeWidth={2.25} strokeDasharray="7 5" strokeLinecap="round" />
+          <path d={linea('altas')} fill="none" stroke={GOOD} strokeWidth={2} strokeLinecap="round" />
+          <path d={linea('bajas')} fill="none" stroke={CRITICAL} strokeWidth={2} strokeLinecap="round" />
+
+          {serie.map((s, i) => (
+            <rect
+              key={i} x={x(i) - (W / serie.length) / 2} y={0} width={W / serie.length} height={H} fill="transparent"
+              onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+            />
+          ))}
+          {hover != null && <line x1={x(hover)} x2={x(hover)} y1={PAD_TOP} y2={H - PAD_BOTTOM} stroke="#d1d5db" strokeWidth={1} strokeDasharray="3 3" />}
+        </svg>
+        {hoverInfo && (
+          <div
+            className="absolute z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg pointer-events-none -translate-x-1/2"
+            style={{ left: `${(x(hover) / W) * 100}%`, top: 0 }}
+          >
+            <p className="font-semibold">{MESES_CORTOS[hoverInfo.mes]}</p>
+            <p className="tabular-nums" style={{ color: '#e3c780' }}>HC activo: {hoverInfo.hcActivo}</p>
+            <p className="tabular-nums" style={{ color: '#86efac' }}>Altas: {hoverInfo.altas}</p>
+            <p className="tabular-nums" style={{ color: '#fca5a5' }}>Bajas: {hoverInfo.bajas}</p>
+          </div>
+        )}
+      </div>
+      <div className="flex gap-1 sm:gap-3 mt-2">
+        {serie.map((s, i) => (
+          <div key={i} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{MESES_CORTOS[s.mes]}</div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-gray-50 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: GOOD }} /> Altas</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: CRITICAL }} /> Bajas</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full border-t-2 border-dashed" style={{ borderColor: GOLD_RAMP[1] }} /> HC activo</span>
+      </div>
+    </div>
+  )
 }
 
 function DomainCard({ to, titulo, sub, children }) {
@@ -193,6 +257,13 @@ export default function BIRH() {
           <p className="text-xs text-gray-400 leading-relaxed">
             *Rotación aproximada: bajas cuyo último cambio de estatus fue este año — Bubble no expone una fecha de baja explícita.
           </p>
+
+          {rh.serieAnual && (
+            <Card>
+              <SectionHeader title="Altas, bajas y headcount activo" sub={`Tendencia mensual · ${new Date().getFullYear()}`} />
+              <TendenciaHCChart serie={rh.serieAnual} />
+            </Card>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <DomainCard to="/rh/rotacion" titulo="Rotación por área" sub="Desglose por área, puesto, costo mensual y lista de colaboradores">

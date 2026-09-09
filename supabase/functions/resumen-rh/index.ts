@@ -58,6 +58,38 @@ Deno.serve(async (req) => {
 
     const nominaEstimadaMensual = hcPorPuesto.reduce((s, p) => s + p.nominaEstimadaMensual, 0)
 
+    // Serie mensual del año en curso: altas (por FechaIngreso), bajas (por
+    // FechaSalida, mismo criterio aproximado que bajasDelAnio) y el HC
+    // activo reconstruido al cierre de cada mes (quién ya había ingresado
+    // y aún no había salido a esa fecha).
+    const anioActual = ahora.getUTCFullYear()
+    const serieAnual = []
+    for (let mes = 0; mes < 12; mes++) {
+      const inicioMes = new Date(Date.UTC(anioActual, mes, 1))
+      const finMes = new Date(Date.UTC(anioActual, mes + 1, 0, 23, 59, 59))
+
+      const altas = empleados.filter((e: any) => {
+        if (!e.FechaIngreso) return false
+        const f = new Date(e.FechaIngreso)
+        return f >= inicioMes && f <= finMes
+      }).length
+
+      const bajas = empleados.filter((e: any) => {
+        if (e.EstatusEmpleado !== 'Baja' || !e.FechaSalida) return false
+        const f = new Date(e.FechaSalida)
+        return f >= inicioMes && f <= finMes
+      }).length
+
+      const hcActivo = empleados.filter((e: any) => {
+        if (!e.FechaIngreso) return false
+        if (new Date(e.FechaIngreso) > finMes) return false
+        if (e.EstatusEmpleado === 'Baja' && e.FechaSalida && new Date(e.FechaSalida) <= finMes) return false
+        return true
+      }).length
+
+      serieAnual.push({ mes, altas, bajas, hcActivo })
+    }
+
     return json({
       headcountActivo,
       bajasDelAnio,
@@ -66,6 +98,7 @@ Deno.serve(async (req) => {
       hcPorArea,
       hcPorPuesto,
       nominaEstimadaMensual,
+      serieAnual,
     })
   } catch (e) {
     return json({ error: e.message }, 502)
