@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { startOfWeek, format } from 'date-fns'
-import { ChevronRight, Plus, Users, RefreshCw, Clock, TrendingUp } from 'lucide-react'
+import { ChevronRight, Plus, Users, RefreshCw, Clock, TrendingUp, Wallet } from 'lucide-react'
 import { formatMoney } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import { llamar, GOLD_RAMP, GOOD, WARNING, CRITICAL, refrescarBI } from './shared'
@@ -224,17 +224,19 @@ function ModalRegistrarPago({ onClose, onGuardado }) {
   )
 }
 
-function CampoCard({ label, children, hint }) {
+function Campo({ label, hint, children }) {
   return (
-    <div className="bg-gray-50 rounded-2xl px-4 py-3">
-      <p className="text-[13px] font-bold text-gray-800 text-center mb-1">{label}</p>
+    <div>
+      <div className="flex items-baseline justify-between">
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+        {hint && <span className="text-[11px] text-gray-300">{hint}</span>}
+      </div>
       {children}
-      {hint && <p className="text-[11px] text-gray-400 text-center mt-1">{hint}</p>}
     </div>
   )
 }
 
-const inputCampo = 'w-full bg-transparent text-center text-sm text-gray-700 placeholder-gray-300 focus:outline-none'
+const inputBase = 'mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#7a6020]/15 focus:border-[#7a6020]/40 transition-colors'
 
 function ModalRegistrarEmpleado({ onClose, onGuardado }) {
   const [catalogos, setCatalogos] = useState(null)
@@ -294,7 +296,7 @@ function ModalRegistrarEmpleado({ onClose, onGuardado }) {
           </div>
           <h3 className="text-lg font-bold text-gray-900">Empleado registrado</h3>
           <p className="text-sm text-gray-500 mt-1">Colaborador #{creado} · {nombre.trim()}</p>
-          <button onClick={onGuardado} className="mt-6 w-full px-4 py-2.5 rounded-full text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718]">
+          <button onClick={onGuardado} className="mt-6 w-full px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718]">
             Listo
           </button>
         </div>
@@ -303,78 +305,99 @@ function ModalRegistrarEmpleado({ onClose, onGuardado }) {
   }
 
   return (
-    <Modal onClose={onClose} maxWidth="max-w-2xl">
+    <Modal onClose={onClose} maxWidth="max-w-3xl">
       <div className="p-6 max-h-[85vh] overflow-y-auto">
-        <h3 className="text-xl font-bold text-gray-900 text-center mb-5">Nuevo Colaborador</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <CampoCard label="Nombre Completo">
-              <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Escribe su nombre" className={inputCampo} />
-            </CampoCard>
-            <CampoCard label="Número Seguro Social" hint="Opcional">
-              <input value={nss} onChange={e => setNss(e.target.value)} placeholder="NSS" className={inputCampo} />
-            </CampoCard>
-            <CampoCard label="Fecha Ingreso">
-              <input type="date" value={fechaIngreso} onChange={e => setFechaIngreso(e.target.value)} className={inputCampo} />
-            </CampoCard>
-            <CampoCard label="Área" hint="Escribe para agregar una nueva">
-              <input list="rh-areas-existentes" value={area} onChange={e => setArea(e.target.value)} placeholder="Escoge el área" className={inputCampo} />
-              <datalist id="rh-areas-existentes">
-                {catalogos?.areas?.map(a => <option key={a} value={a} />)}
-              </datalist>
-            </CampoCard>
-            <CampoCard label="Puesto" hint="Escribe para agregar uno nuevo">
-              <input
-                list="rh-puestos-existentes" value={puesto}
-                onChange={e => elegirPuesto(e.target.value)}
-                placeholder="Escoge el puesto"
-                className={inputCampo}
-              />
-              <datalist id="rh-puestos-existentes">
-                {catalogos?.puestos?.map(p => <option key={p.nombre} value={p.nombre} />)}
-              </datalist>
-            </CampoCard>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${GOLD_RAMP[1]}14` }}>
+            <Users size={18} style={{ color: GOLD_RAMP[1] }} />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Registrar nuevo empleado</h3>
+            <p className="text-xs text-gray-400">Se agrega a headcount, rotación y asistencia junto con los de Bubble</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr] gap-8">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Campo label="Nombre completo">
+                  <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Apellido Apellido Nombre" className={inputBase} />
+                </Campo>
+              </div>
+              <Campo label="Número de seguro social" hint="opcional">
+                <input value={nss} onChange={e => setNss(e.target.value)} placeholder="NSS" className={inputBase} />
+              </Campo>
+              <Campo label="Fecha de ingreso">
+                <input type="date" value={fechaIngreso} onChange={e => setFechaIngreso(e.target.value)} className={inputBase} />
+              </Campo>
+              <Campo label="Área" hint="o escribe una nueva">
+                <input list="rh-areas-existentes" value={area} onChange={e => setArea(e.target.value)} placeholder="Cocina, Comedor..." className={inputBase} />
+                <datalist id="rh-areas-existentes">
+                  {catalogos?.areas?.map(a => <option key={a} value={a} />)}
+                </datalist>
+              </Campo>
+              <Campo label="Puesto" hint="o escribe uno nuevo">
+                <input
+                  list="rh-puestos-existentes" value={puesto}
+                  onChange={e => elegirPuesto(e.target.value)}
+                  placeholder="Mesero, Cocinero..."
+                  className={inputBase}
+                />
+                <datalist id="rh-puestos-existentes">
+                  {catalogos?.puestos?.map(p => <option key={p.nombre} value={p.nombre} />)}
+                </datalist>
+              </Campo>
+            </div>
+
             {puestoExistente ? (
-              <CampoCard label="Sueldo Diario" hint={`Según el puesto "${puesto}"`}>
-                <p className="text-center text-sm font-bold text-gray-700 tabular-nums">{formatMoney(puestoExistente.sueldoDiario)}</p>
-              </CampoCard>
+              <div className="flex items-center gap-3 rounded-lg px-3.5 py-3" style={{ background: `${GOOD}0d` }}>
+                <Wallet size={16} style={{ color: GOOD }} className="flex-shrink-0" />
+                <p className="text-sm text-gray-700">
+                  Sueldo diario <span className="font-bold tabular-nums" style={{ color: GOOD }}>{formatMoney(puestoExistente.sueldoDiario)}</span>, según el puesto "{puesto}"
+                </p>
+              </div>
             ) : puesto.trim() ? (
-              <CampoCard label="Sueldo Diario" hint="Puesto nuevo — captúralo aquí">
-                <input type="number" value={sueldoDiario} onChange={e => setSueldoDiario(e.target.value)} placeholder="0.00" className={`${inputCampo} tabular-nums`} />
-              </CampoCard>
+              <Campo label="Sueldo diario" hint={`"${puesto}" es un puesto nuevo — captúralo`}>
+                <input type="number" value={sueldoDiario} onChange={e => setSueldoDiario(e.target.value)} placeholder="0.00" className={`${inputBase} tabular-nums`} />
+              </Campo>
             ) : null}
-            <CampoCard label="Número de Colaborador" hint="Se asigna automático al guardar">
-              <p className="text-center text-sm text-gray-300">###</p>
-            </CampoCard>
-            {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+
+            {error && <p className="text-xs text-red-500">{error}</p>}
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancelar</button>
+              <button onClick={guardar} disabled={guardando} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718] disabled:opacity-50">
+                {guardando ? 'Guardando...' : 'Registrar empleado'}
+              </button>
+            </div>
           </div>
 
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Sueldos diarios de referencia</p>
-            <div className="border border-gray-100 rounded-lg max-h-64 overflow-y-auto">
-              {!catalogos ? (
-                <p className="text-xs text-gray-300 p-3">Cargando...</p>
-              ) : catalogos.puestos.length === 0 ? (
-                <p className="text-xs text-gray-300 p-3">Sin datos aún.</p>
-              ) : (
-                <table className="w-full text-xs">
-                  <tbody>
-                    {catalogos.puestos.map(p => (
-                      <tr key={p.nombre} className="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50" onClick={() => elegirPuesto(p.nombre)}>
-                        <td className="px-3 py-2 text-gray-600">{p.nombre}</td>
-                        <td className="px-3 py-2 text-right font-bold text-gray-800 tabular-nums">{formatMoney(p.sueldoDiario)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2.5">Sueldos diarios por puesto</p>
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <div className="max-h-80 overflow-y-auto">
+                {!catalogos ? (
+                  <p className="text-xs text-gray-300 p-4">Cargando...</p>
+                ) : catalogos.puestos.length === 0 ? (
+                  <p className="text-xs text-gray-300 p-4">Sin datos aún.</p>
+                ) : (
+                  catalogos.puestos.map(p => (
+                    <button
+                      key={p.nombre}
+                      type="button"
+                      onClick={() => elegirPuesto(p.nombre)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors ${puesto === p.nombre ? 'bg-gray-50' : ''}`}
+                    >
+                      <span className="text-xs text-gray-600 truncate">{p.nombre}</span>
+                      <span className="text-xs font-bold text-gray-800 tabular-nums flex-shrink-0 ml-2">{formatMoney(p.sueldoDiario)}</span>
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
+            <p className="text-[11px] text-gray-300 mt-2">Click en un puesto para usarlo en el formulario.</p>
           </div>
-        </div>
-        <div className="flex justify-center mt-6">
-          <button onClick={guardar} disabled={guardando} className="px-8 py-2.5 rounded-full text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718] disabled:opacity-50 inline-flex items-center gap-2">
-            <Plus size={15} /> {guardando ? 'Guardando...' : 'Registrar Nuevo Empleado'}
-          </button>
         </div>
       </div>
     </Modal>
