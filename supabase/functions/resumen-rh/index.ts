@@ -29,6 +29,7 @@ Deno.serve(async (req) => {
   const user = await requirePermiso(req, ['rh', 'dashboard'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
+  const body = await req.json().catch(() => ({}))
   const { bubbleUrl, bubbleToken } = bubbleEnv()
 
   try {
@@ -81,15 +82,20 @@ Deno.serve(async (req) => {
 
     const nominaEstimadaMensual = hcPorPuesto.reduce((s, p) => s + p.nominaEstimadaMensual, 0)
 
-    // Serie mensual del año en curso: altas (por FechaIngreso), bajas (por
-    // FechaSalida, mismo criterio aproximado que bajasDelAnio) y el HC
-    // activo reconstruido al cierre de cada mes (quién ya había ingresado
-    // y aún no había salido a esa fecha).
-    const anioActual = ahora.getUTCFullYear()
+    // Serie de últimos 12 meses (LTM) terminando en el mes seleccionado
+    // (selector de mes global de la app, default: mes en curso): altas
+    // (por FechaIngreso), bajas (por FechaSalida, mismo criterio
+    // aproximado que bajasDelAnio) y el HC activo reconstruido al cierre
+    // de cada mes.
+    const anioSel = body.anio ?? ahora.getUTCFullYear()
+    const mesSel = body.mes ?? ahora.getUTCMonth() + 1 // 1-12
     const serieAnual = []
-    for (let mes = 0; mes < 12; mes++) {
-      const inicioMes = new Date(Date.UTC(anioActual, mes, 1))
-      const finMes = new Date(Date.UTC(anioActual, mes + 1, 0, 23, 59, 59))
+    for (let i = 11; i >= 0; i--) {
+      const refMes = new Date(Date.UTC(anioSel, mesSel - 1 - i, 1))
+      const anioMes = refMes.getUTCFullYear()
+      const mes = refMes.getUTCMonth() // 0-indexado
+      const inicioMes = new Date(Date.UTC(anioMes, mes, 1))
+      const finMes = new Date(Date.UTC(anioMes, mes + 1, 0, 23, 59, 59))
 
       const altas = empleados.filter((e: any) => {
         if (!e.FechaIngreso) return false
@@ -110,7 +116,7 @@ Deno.serve(async (req) => {
         return true
       }).length
 
-      serieAnual.push({ mes, altas, bajas, hcActivo })
+      serieAnual.push({ anio: anioMes, mes, altas, bajas, hcActivo })
     }
 
     // Comparativas YoY: mismo corte relativo (hoy) pero un año antes, para

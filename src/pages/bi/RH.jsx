@@ -6,6 +6,7 @@ import { formatMoney } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import { llamar, GOLD_RAMP, GOOD, WARNING, CRITICAL, refrescarBI } from './shared'
 import { Card, PageHeader, SectionHeader, LoadingState, ErrorState, DonutGauge, DeltaPill } from './ui'
+import { useMesSeleccionado, SelectorMes } from './mesContext'
 import Modal from '../../components/ui/Modal'
 
 const AUSENCIAS_ESTILO = [
@@ -230,11 +231,12 @@ export default function BIRH() {
   const [modalPago, setModalPago] = useState(false)
 
   const lunesStr = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const { anio, mes } = useMesSeleccionado()
 
   function cargar() {
     setLoading(true)
     Promise.allSettled([
-      llamar('resumen-rh'),
+      llamar('resumen-rh', { anio, mes }),
       llamar('rh-rotacion'),
       llamar('rh-asistencia', { action: 'list', lunes: lunesStr }),
     ]).then(([r1, r2, r3]) => {
@@ -246,7 +248,7 @@ export default function BIRH() {
     })
   }
 
-  useEffect(cargar, [])
+  useEffect(cargar, [anio, mes])
 
   const totalCeldas = asistencia ? asistencia.empleados.length * 7 : 0
   const totalAusencias = asistencia
@@ -311,7 +313,7 @@ export default function BIRH() {
 
           {rh.serieAnual && (
             <Card>
-              <SectionHeader title="Altas, bajas y headcount activo" sub={`Tendencia mensual · ${new Date().getFullYear()}`} />
+              <SectionHeader title="Altas, bajas y headcount activo" sub="Últimos 12 meses" right={<SelectorMes />} />
               <TendenciaHCChart serie={rh.serieAnual} />
             </Card>
           )}
