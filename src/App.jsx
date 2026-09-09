@@ -152,6 +152,10 @@ export default function App() {
           <Route element={<SoloPermiso seccion="pagos" />}>
             <Route path="/pagos/ritmo" element={<BICxPRitmo />} />
           </Route>
+
+          <Route element={<SoloPermiso seccion="rh" />}>
+            <Route path="/rh" element={<BIRH />} />
+          </Route>
         </Route>
 
         <Route element={<SoloPermiso seccion="pagos" />}>
@@ -164,7 +168,6 @@ export default function App() {
         </Route>
 
         <Route element={<SoloPermiso seccion="rh" />}>
-          <Route path="/rh" element={<BIRH />} />
           <Route path="/rh/rotacion" element={<BIRHRotacion />} />
           <Route path="/rh/asistencia" element={<BIRHAsistencia />} />
           <Route path="/rh/reporte-semanal" element={<BIReporteSemanal />} />
