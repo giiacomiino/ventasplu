@@ -2,20 +2,35 @@ import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { WARNING, CRITICAL, GOLD_RAMP, refrescarBI } from './shared'
+import { GOOD, WARNING, CRITICAL, GOLD_RAMP, refrescarBI } from './shared'
 import { Card, PageHeader, KpiTile, LoadingState, ErrorState, EmptyState } from './ui'
 import { useSemanaSeleccionada } from './useSemanaSeleccionada'
 
 const DIAS_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
-// Sin fila = asistió (default). Al desmarcar el checkbox se guarda como
-// "falta" y se puede afinar a una razón más específica con el selector.
+// Sin fila = asistió (default), pero SOLO para días que ya pasaron o son
+// hoy — es un registro retrospectivo. Al desmarcar el checkbox se guarda
+// como "falta" y se puede afinar a una razón más específica con el
+// selector.
 const RAZONES = [
   { valor: 'falta', label: 'Falta', color: CRITICAL },
   { valor: 'descanso', label: 'Descanso', color: '#8a94a6' },
   { valor: 'vacaciones', label: 'Vacaciones', color: GOLD_RAMP[1] },
   { valor: 'incapacidad', label: 'Incapacidad', color: WARNING },
   { valor: 'permiso', label: 'Permiso', color: '#8a6fbd' },
+]
+
+// Para días que todavía no pasan, la hoja es un rol/planeación, no un
+// registro — no se puede asumir "trabajó" de algo que no ha ocurrido. Sin
+// fila = sin planear todavía (ni asistencia ni ausencia), y "Trabajo" es
+// una opción explícita más, no el default.
+const OPCIONES_PLAN = [
+  { valor: 'trabajo', label: 'Trabajo', color: GOOD },
+  { valor: 'descanso', label: 'Descanso', color: '#8a94a6' },
+  { valor: 'vacaciones', label: 'Vacaciones', color: GOLD_RAMP[1] },
+  { valor: 'permiso', label: 'Permiso', color: '#8a6fbd' },
+  { valor: 'incapacidad', label: 'Incapacidad', color: WARNING },
+  { valor: 'falta', label: 'Falta', color: CRITICAL },
 ]
 
 function agruparPorAreaPuesto(empleados) {
@@ -62,6 +77,28 @@ function CeldaAsistencia({ estado, onChange, guardando }) {
         </select>
       )}
     </div>
+  )
+}
+
+// Día que todavía no pasa: nada preseleccionado, con borde punteado para
+// distinguirlo visualmente de un día ya registrado.
+function CeldaPlaneada({ estado, onChange, guardando }) {
+  const cfg = OPCIONES_PLAN.find(o => o.valor === estado)
+  return (
+    <select
+      value={estado || ''}
+      disabled={guardando}
+      onChange={e => onChange(e.target.value || null)}
+      className="w-full text-[10px] font-bold text-center rounded-md border border-dashed py-1.5 cursor-pointer focus:outline-none focus:ring-1 disabled:opacity-50"
+      style={{
+        background: cfg ? `${cfg.color}22` : '#fafafa',
+        color: cfg ? cfg.color : '#c4c4c4',
+        borderColor: cfg ? `${cfg.color}55` : '#e5e7eb',
+      }}
+    >
+      <option value="">Sin planear</option>
+      {OPCIONES_PLAN.map(o => <option key={o.valor} value={o.valor}>{o.label}</option>)}
+    </select>
   )
 }
 
@@ -118,12 +155,14 @@ export default function BIRHAsistencia() {
     setGuardandoCelda(null)
   }
 
+  const hoyStr = new Date().toISOString().slice(0, 10)
   const grupos = agruparPorAreaPuesto(empleados)
   const totalCeldas = empleados.length * 7
   const ausencias = resumenSemana
     ? RAZONES.reduce((s, r) => s + (resumenSemana[r.valor] ?? 0), 0)
     : 0
-  const asistieron = totalCeldas - ausencias
+  const sinPlanear = resumenSemana?.sinPlanear ?? 0
+  const asistieron = Math.max(totalCeldas - ausencias - sinPlanear, 0)
 
   return (
     <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
@@ -133,7 +172,7 @@ export default function BIRHAsistencia() {
         </Link>
         <PageHeader
           title="Asistencia semanal"
-          sub="Por defecto todos asisten — desmarca un día para registrar la razón"
+          sub="Días pasados: por defecto asisten, desmarca para registrar la razón. Días futuros: en blanco, para que planees el rol."
           right={
             <div className="flex items-center gap-2">
               <button onClick={anterior} className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"><ChevronLeft size={16} /></button>
@@ -148,11 +187,12 @@ export default function BIRHAsistencia() {
       {error && <ErrorState message={error} />}
 
       {!loading && resumenSemana && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
           <KpiTile label="Asistió" value={asistieron} />
           {RAZONES.map(r => (
             <KpiTile key={r.valor} label={r.label} value={resumenSemana[r.valor] ?? 0} />
           ))}
+          <KpiTile label="Sin planear" value={sinPlanear} sub={sinPlanear > 0 ? 'días por asignar' : 'semana completa'} />
         </div>
       )}
 
@@ -197,11 +237,19 @@ export default function BIRHAsistencia() {
                               </td>
                               {emp.dias.map(d => (
                                 <td key={d.fecha} className="px-1.5 py-2">
-                                  <CeldaAsistencia
-                                    estado={d.estado}
-                                    guardando={guardandoCelda === `${emp.empleadoBubbleId}:${d.fecha}`}
-                                    onChange={estado => cambiarEstado(emp, d.fecha, estado)}
-                                  />
+                                  {d.fecha > hoyStr ? (
+                                    <CeldaPlaneada
+                                      estado={d.estado}
+                                      guardando={guardandoCelda === `${emp.empleadoBubbleId}:${d.fecha}`}
+                                      onChange={estado => cambiarEstado(emp, d.fecha, estado)}
+                                    />
+                                  ) : (
+                                    <CeldaAsistencia
+                                      estado={d.estado}
+                                      guardando={guardandoCelda === `${emp.empleadoBubbleId}:${d.fecha}`}
+                                      onChange={estado => cambiarEstado(emp, d.fecha, estado)}
+                                    />
+                                  )}
                                 </td>
                               ))}
                             </tr>

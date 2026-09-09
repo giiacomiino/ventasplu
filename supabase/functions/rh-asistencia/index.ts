@@ -52,13 +52,27 @@ Deno.serve(async (req) => {
       const registroPorClave = new Map<string, string>()
       for (const r of registros ?? []) registroPorClave.set(`${r.empleado_bubble_id}:${r.fecha}`, r.estado)
 
-      const resumenSemana: Record<string, number> = { trabajo: 0, descanso: 0, vacaciones: 0, falta: 0, incapacidad: 0, permiso: 0 }
+      // "asistioImplicito" y "sinPlanear" cubren las celdas sin fila
+      // guardada: si el día ya pasó (o es hoy), sin fila = se asume que
+      // trabajó (registro retrospectivo); si el día todavía no pasa, sin
+      // fila = todavía no se planea — no se le puede asumir nada, es
+      // justo lo que RH tiene que decidir para armar el rol de la semana.
+      const hoyStr = fechaISO(new Date())
+      const resumenSemana: Record<string, number> = {
+        trabajo: 0, descanso: 0, vacaciones: 0, falta: 0, incapacidad: 0, permiso: 0,
+        asistioImplicito: 0, sinPlanear: 0,
+      }
 
       const empleadosResp = activos.map((e: any) => {
         const nombre = e.NombreEmpleado || 'Sin nombre'
         const dias = dias7.map(fecha => {
           const estado = registroPorClave.get(`${e._id}:${fecha}`) ?? null
-          if (estado && estado in resumenSemana) resumenSemana[estado] += 1
+          if (estado && estado in resumenSemana) {
+            resumenSemana[estado] += 1
+          } else if (!estado) {
+            if (fecha <= hoyStr) resumenSemana.asistioImplicito += 1
+            else resumenSemana.sinPlanear += 1
+          }
           return { fecha, estado }
         })
 

@@ -446,7 +446,9 @@ export default function BIRH() {
   const totalAusencias = asistencia
     ? AUSENCIAS_ESTILO.reduce((s, e) => s + (asistencia.resumenSemana[e.valor] ?? 0), 0)
     : 0
-  const pctAsistencia = totalCeldas > 0 ? Math.max(totalCeldas - totalAusencias, 0) / totalCeldas : 1
+  const sinPlanear = asistencia?.resumenSemana?.sinPlanear ?? 0
+  const diasDeterminados = totalCeldas - sinPlanear
+  const pctAsistencia = diasDeterminados > 0 ? Math.max(diasDeterminados - totalAusencias, 0) / diasDeterminados : 1
   const desgloseAusencias = asistencia
     ? AUSENCIAS_ESTILO.map(e => ({ ...e, valor2: asistencia.resumenSemana[e.valor] ?? 0 })).filter(e => e.valor2 > 0)
     : []
