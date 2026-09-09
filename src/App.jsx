@@ -23,6 +23,8 @@ import BICxPDepositos from './pages/bi/CxPDepositos'
 import BICxPRitmo from './pages/bi/CxPRitmo'
 import BICxPPendientes from './pages/bi/CxPPendientes'
 import BIRH from './pages/bi/RH'
+import BIRHRotacion from './pages/bi/RHRotacion'
+import BIRHAsistencia from './pages/bi/RHAsistencia'
 import BIReporteSemanal from './pages/bi/ReporteSemanal'
 import BIFinanciero from './pages/bi/Financiero'
 import BITendenciaCierre from './pages/bi/TendenciaCierre'
@@ -163,6 +165,8 @@ export default function App() {
 
         <Route element={<SoloPermiso seccion="rh" />}>
           <Route path="/rh" element={<BIRH />} />
+          <Route path="/rh/rotacion" element={<BIRHRotacion />} />
+          <Route path="/rh/asistencia" element={<BIRHAsistencia />} />
           <Route path="/rh/reporte-semanal" element={<BIReporteSemanal />} />
         </Route>
 

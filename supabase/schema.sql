@@ -455,3 +455,43 @@ CREATE TABLE IF NOT EXISTS formas_pago_config (
 );
 
 ALTER TABLE formas_pago_config ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
+-- TABLA: rh_asistencias (asistencia semanal nativa de VURA BI)
+-- Un registro por empleado por día. Sin fila = día sin registrar. El
+-- empleado se referencia por su _id de Bubble (empleado_bubble_id), con el
+-- nombre copiado al momento de registrar para que la vista no dependa de
+-- una consulta a Bubble para nombres históricos.
+-- =============================================
+CREATE TABLE IF NOT EXISTS rh_asistencias (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  empleado_bubble_id text NOT NULL,
+  empleado_nombre text NOT NULL,
+  fecha date NOT NULL,
+  estado text NOT NULL CHECK (estado IN ('trabajo','descanso','vacaciones','falta','incapacidad','permiso')),
+  registrado_por uuid REFERENCES profiles(id),
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE (empleado_bubble_id, fecha)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_asistencias_fecha ON rh_asistencias(fecha);
+
+ALTER TABLE rh_asistencias ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
+-- TABLA: rh_pagos_nomina (registro de pagos reales de nómina)
+-- Un registro simple por pago semanal (normalmente lunes): fecha + monto
+-- transferido, sin desglose — igual que el registro equivalente en Bubble.
+-- =============================================
+CREATE TABLE IF NOT EXISTS rh_pagos_nomina (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  fecha_pago date NOT NULL,
+  monto numeric(12,2) NOT NULL CHECK (monto >= 0),
+  registrado_por uuid REFERENCES profiles(id),
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_pagos_nomina_fecha ON rh_pagos_nomina(fecha_pago);
+
+ALTER TABLE rh_pagos_nomina ENABLE ROW LEVEL SECURITY;
