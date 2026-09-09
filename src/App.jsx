@@ -14,6 +14,7 @@ import BIVentasFormasPago from './pages/bi/VentasFormasPago'
 import BIVentasPlu from './pages/bi/VentasPlu'
 import BIPresupuesto from './pages/bi/Presupuesto'
 import BIProveedores from './pages/bi/Proveedores'
+import BIProveedoresCatalogo from './pages/bi/ProveedoresCatalogo'
 import Compras from './pages/bi/Compras'
 import BICxP from './pages/bi/CxP'
 import BICxPFacturas from './pages/bi/CxPFacturas'
@@ -199,6 +200,10 @@ export default function App() {
         <Route element={<SoloPermiso seccion="rh" />}>
           <Route path="/rh/rotacion" element={<BIRHRotacion />} />
           <Route path="/rh/asistencia" element={<BIRHAsistencia />} />
+        </Route>
+
+        <Route element={<SoloPermiso seccion="proveedores" />}>
+          <Route path="/proveedores/catalogo" element={<BIProveedoresCatalogo />} />
         </Route>
 
         <Route element={<SoloPermiso seccion="compras" />}>

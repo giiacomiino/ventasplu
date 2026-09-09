@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsHeaders, json, bubbleEnv, bubbleGet, conOrg, requireRole } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
 
 // Siembra/actualiza el catálogo nativo `proveedores` con los días de
 // crédito que ya existen en Bubble — de ahí en adelante esa tabla es la
@@ -14,12 +14,9 @@ Deno.serve(async (req) => {
 
   try {
     const { bubbleUrl, bubbleToken } = bubbleEnv()
-    const proveedoresData = await bubbleGet(bubbleUrl, bubbleToken, 'Proveedor', {
-      constraints: JSON.stringify(conOrg()),
-      limit: '200',
-    })
+    const proveedoresBubble = await bubbleGetAll(bubbleUrl, bubbleToken, 'Proveedor', conOrg())
 
-    const filas = proveedoresData.response.results
+    const filas = proveedoresBubble
       .map((p: any) => {
         const nombre = (p.RazonSocial || p['Razón Social'] || p.Nombre || '').trim()
         const dias = p['Días de crédito'] ?? p.DiasDeCredito ?? p['Dias de credito'] ?? null

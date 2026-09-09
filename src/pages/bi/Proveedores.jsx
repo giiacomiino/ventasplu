@@ -146,7 +146,14 @@ export default function BIProveedores() {
         <PageHeader
           title="Proveedores"
           sub="Auditoría de gasto por proveedor — ventana móvil de 12 meses (excluye Fonda La Trattoria, proveedor interno)"
-          right={<SelectorMes />}
+          right={
+            <div className="flex items-center gap-2">
+              <Link to="/proveedores/catalogo" className="text-xs font-semibold text-gray-500 hover:text-gray-800 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                Ver catálogo
+              </Link>
+              <SelectorMes />
+            </div>
+          }
         />
       </div>
 
