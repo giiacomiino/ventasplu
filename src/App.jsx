@@ -77,7 +77,8 @@ function SinAcceso() {
 // sí mismo por accidente.
 function SoloPermiso({ seccion }) {
   const { profile } = useAuth()
-  const tieneAcceso = profile?.rol === 'owner' || profile?.permisos?.[seccion] === true
+  const secciones = Array.isArray(seccion) ? seccion : [seccion]
+  const tieneAcceso = profile?.rol === 'owner' || secciones.some(s => profile?.permisos?.[s] === true)
   if (profile && !tieneAcceso) {
     const destino = rutaDisponible(profile)
     return destino ? <Navigate to={destino} replace /> : <SinAcceso />
@@ -115,7 +116,7 @@ export default function App() {
           <Route path="/" element={<VentasPlu />} />
         </Route>
 
-        <Route element={<SoloPermiso seccion="dashboard" />}>
+        <Route element={<SoloPermiso seccion={['dashboard', 'ventas', 'pagos', 'rh', 'proveedores', 'presupuesto', 'pnl']} />}>
           <Route path="/dashboard" element={<BIOverview />} />
         </Route>
 

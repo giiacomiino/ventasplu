@@ -165,19 +165,24 @@ export default function BIOverview() {
   const { profile } = useAuth()
   const esOwner = profile?.rol === 'owner'
   const puede = seccion => esOwner || profile?.permisos?.[seccion] === true
+  // 'dashboard' es un permiso "ver todo": igual que ya hacen resumen-ventas,
+  // resumen-pagos, etc. en el backend (requirePermiso admite ['x','dashboard']),
+  // alguien con 'dashboard' ve todos los bloques aunque no tenga el permiso
+  // específico de cada módulo.
+  const puedeVer = seccion => puede('dashboard') || puede(seccion)
 
   function cargar() {
     setLoading(true)
     const nada = Promise.resolve(null)
     Promise.allSettled([
-      puede('ventas') ? llamar('resumen-ventas') : nada,
-      puede('ventas') ? llamar('resumen-ventas-anual') : nada,
-      (puede('proveedores') || puede('presupuesto')) ? llamar('resumen-negocio') : nada,
-      puede('pagos') ? llamar('resumen-pagos') : nada,
-      puede('rh') ? llamar('resumen-rh') : nada,
-      puede('pnl') ? llamar('resumen-financiero') : nada,
-      puede('pnl') ? llamar('tendencia-cierre') : nada,
-      puede('pagos') ? llamar('ritmo-gasto') : nada,
+      puedeVer('ventas') ? llamar('resumen-ventas') : nada,
+      puedeVer('ventas') ? llamar('resumen-ventas-anual') : nada,
+      (puedeVer('proveedores') || puedeVer('presupuesto')) ? llamar('resumen-negocio') : nada,
+      puedeVer('pagos') ? llamar('resumen-pagos') : nada,
+      puedeVer('rh') ? llamar('resumen-rh') : nada,
+      puedeVer('pnl') ? llamar('resumen-financiero') : nada,
+      puedeVer('pnl') ? llamar('tendencia-cierre') : nada,
+      puedeVer('pagos') ? llamar('ritmo-gasto') : nada,
     ]).then(([r1, r2, r3, r4, r5, r6, r7, r8]) => {
       if (r1.status === 'fulfilled') setVentas(r1.value)
       if (r2.status === 'fulfilled') setAnual(r2.value)
@@ -281,9 +286,9 @@ export default function BIOverview() {
       {error && <ErrorState message={error} />}
 
       {/* ── KPI hero row ── */}
-      {(puede('ventas') || puede('presupuesto') || puede('pagos') || puede('rh')) && (
+      {(puedeVer('ventas') || puedeVer('presupuesto') || puedeVer('pagos') || puedeVer('rh')) && (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
-        {puede('ventas') && ayer && (
+        {puedeVer('ventas') && ayer && (
           <KpiTile
             label="Venta neta de ayer"
             value={formatMoney(ayer.ventaNeta)}
@@ -291,7 +296,7 @@ export default function BIOverview() {
             delta={<DeltaPill pct={ayer.diferenciaPct} />}
           />
         )}
-        {puede('ventas') && mtd && (
+        {puedeVer('ventas') && mtd && (
           <KpiTile
             label="Venta neta MTD"
             value={formatMoney(mtd.ventaNeta)}
@@ -304,7 +309,7 @@ export default function BIOverview() {
             }
           />
         )}
-        {puede('presupuesto') && pctPresupuesto != null && (
+        {puedeVer('presupuesto') && pctPresupuesto != null && (
           <KpiTile
             label="% Presupuesto usado"
             value={`${(pctPresupuesto * 100).toFixed(0)}%`}
@@ -322,7 +327,7 @@ export default function BIOverview() {
             }
           />
         )}
-        {puede('pagos') && pagos && (
+        {puedeVer('pagos') && pagos && (
           <KpiTile
             label="C×P pendientes"
             value={formatMoney(pagos.totalPendiente)}
@@ -338,7 +343,7 @@ export default function BIOverview() {
             }
           />
         )}
-        {puede('rh') && rh && (
+        {puedeVer('rh') && rh && (
           <KpiTile
             label="Headcount activo"
             value={rh.headcountActivo}
@@ -350,9 +355,9 @@ export default function BIOverview() {
       )}
 
       {/* ── Ventas + Presupuesto ── */}
-      {(puede('ventas') || puede('presupuesto')) && (
+      {(puedeVer('ventas') || puedeVer('presupuesto')) && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {puede('ventas') && anual?.serie && (
+        {puedeVer('ventas') && anual?.serie && (
           <DomainCard
             to="/ventas"
             titulo="Ventas"
@@ -363,7 +368,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {puede('presupuesto') && negocio?.presupuesto && (
+        {puedeVer('presupuesto') && negocio?.presupuesto && (
           <DomainCard to="/presupuesto" titulo="Presupuesto" sub={`Uso vs. límite por categoría · ${format(new Date(negocio.presupuesto.mes), 'MMMM', { locale: es })}`}>
             <div>
               <div className="flex items-center justify-center gap-6 py-1 mb-6">
@@ -399,9 +404,9 @@ export default function BIOverview() {
       )}
 
       {/* ── Proveedores + Pagos + RH ── */}
-      {(puede('proveedores') || puede('pagos') || puede('rh')) && (
+      {(puedeVer('proveedores') || puedeVer('pagos') || puedeVer('rh')) && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {puede('proveedores') && negocio?.proveedores && (
+        {puedeVer('proveedores') && negocio?.proveedores && (
           <DomainCard to="/proveedores" titulo="Proveedores" sub={`Top ${Math.min(5, negocio.proveedores.top.length)} por gasto · 30 días`}>
             <div className="space-y-2.5 mb-4">
               {negocio.proveedores.top.slice(0, 5).map((p, i) => (
@@ -430,7 +435,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {puede('pagos') && pagos && (
+        {puedeVer('pagos') && pagos && (
           <DomainCard to="/pagos" titulo="Cuentas por pagar" sub="Urgencia de cobro pendiente">
             <p className="text-2xl font-bold text-gray-900 tabular-nums mb-1">{formatMoney(pagos.totalPendiente)}</p>
             <p className="text-xs text-gray-400 mb-4">total por liquidar</p>
@@ -463,7 +468,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {puede('rh') && rh && (
+        {puedeVer('rh') && rh && (
           <DomainCard to="/rh" titulo="Recursos Humanos" sub="Headcount · nómina estimada">
             <div className="flex items-baseline justify-between mb-4">
               <div>
@@ -495,7 +500,7 @@ export default function BIOverview() {
       </div>
       )}
 
-      {puede('pagos') && ritmo && (
+      {puedeVer('pagos') && ritmo && (
         <DomainCard to="/pagos/ritmo" titulo="Ritmo de gasto" sub={`Día ${ritmo.diaCorte} de ${ritmo.diasDelMes} · gasto real vs. ritmo ideal`}>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3 flex-shrink-0">
@@ -523,9 +528,9 @@ export default function BIOverview() {
       )}
 
       {/* ── Top PLU + Financiero ── */}
-      {(puede('ventas') || puede('pnl') || puede('rh')) && (
+      {(puedeVer('ventas') || puedeVer('pnl') || puedeVer('rh')) && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {puede('ventas') && (
+        {puedeVer('ventas') && (
         <DomainCard to="/ventas/plu" titulo="Top PLU" sub="Productos más vendidos · mes en curso">
           {topPlu.length === 0 ? (
             <p className="text-xs text-gray-300 py-4">Cargando...</p>
@@ -547,7 +552,7 @@ export default function BIOverview() {
         </DomainCard>
         )}
 
-        {puede('pnl') && financiero && (
+        {puedeVer('pnl') && financiero && (
           <DomainCard to="/pnl" titulo="Panorama financiero" sub="Margen bruto · venta neta YTD" span={2}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center py-2">
               <div className="min-w-0 flex flex-col items-center">
@@ -586,9 +591,9 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {(puede('pnl') || puede('rh')) && (
+        {(puedeVer('pnl') || puedeVer('rh')) && (
         <div className="col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {puede('pnl') && cierre && (
+          {puedeVer('pnl') && cierre && (
             <DomainCard
               to="/pnl/tendencia-cierre"
               titulo="Tendencia de cierre"
@@ -610,7 +615,7 @@ export default function BIOverview() {
             </DomainCard>
           )}
 
-          {puede('rh') && (
+          {puedeVer('rh') && (
           <DomainCard
             to="/rh/reporte-semanal"
             titulo="Reporte semanal"

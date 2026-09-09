@@ -36,7 +36,7 @@ function NavLinks({ profile, linkClass, onNavigate }) {
 
   return (
     <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-      {puede('dashboard') && (
+      {(puede('dashboard') || puede('ventas') || puede('pagos') || puede('rh') || puede('proveedores') || puede('presupuesto') || puede('pnl')) && (
         <NavLink to="/dashboard" className={linkClass} onClick={onNavigate}>
           <LayoutDashboard size={16} /> Dashboard
         </NavLink>
