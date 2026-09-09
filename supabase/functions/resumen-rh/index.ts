@@ -1,5 +1,28 @@
 import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso } from '../_shared/bubble.ts'
 
+// Headcount activo reconstruido a cualquier fecha de corte: quién ya
+// había ingresado y aún no había salido a esa fecha. Se usa tanto para la
+// serie mensual como para las comparativas YoY.
+function hcActivoAlCorte(empleados: any[], corte: Date): number {
+  return empleados.filter((e: any) => {
+    if (!e.FechaIngreso) return false
+    if (new Date(e.FechaIngreso) > corte) return false
+    if (e.EstatusEmpleado === 'Baja' && e.FechaSalida && new Date(e.FechaSalida) <= corte) return false
+    return true
+  }).length
+}
+
+function antiguedadPromedioAlCorte(empleados: any[], corte: Date): number | null {
+  const activosCorte = empleados.filter((e: any) => {
+    if (!e.FechaIngreso) return false
+    if (new Date(e.FechaIngreso) > corte) return false
+    if (e.EstatusEmpleado === 'Baja' && e.FechaSalida && new Date(e.FechaSalida) <= corte) return false
+    return true
+  })
+  const antiguedades = activosCorte.map((e: any) => (corte.getTime() - new Date(e.FechaIngreso).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+  return antiguedades.length ? antiguedades.reduce((a, b) => a + b, 0) / antiguedades.length : null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -90,6 +113,28 @@ Deno.serve(async (req) => {
       serieAnual.push({ mes, altas, bajas, hcActivo })
     }
 
+    // Comparativas YoY: mismo corte relativo (hoy) pero un año antes, para
+    // headcount, rotación y antigüedad. Bajas hace un año se acota YTD del
+    // año anterior, igual criterio que rotacionAnual.
+    const haceUnAnio = new Date(Date.UTC(ahora.getUTCFullYear() - 1, ahora.getUTCMonth(), ahora.getUTCDate()))
+    const inicioAnioAnterior = new Date(Date.UTC(ahora.getUTCFullYear() - 1, 0, 1))
+
+    const headcountActivoAnioAnterior = hcActivoAlCorte(empleados, haceUnAnio)
+    const bajasYtdAnioAnterior = empleados.filter((e: any) =>
+      e.EstatusEmpleado === 'Baja' && e.FechaSalida && new Date(e.FechaSalida) >= inicioAnioAnterior && new Date(e.FechaSalida) <= haceUnAnio,
+    ).length
+    const rotacionAnualAnterior = headcountActivoAnioAnterior > 0 ? bajasYtdAnioAnterior / headcountActivoAnioAnterior : null
+    const antiguedadPromedioAnioAnterior = antiguedadPromedioAlCorte(empleados, haceUnAnio)
+
+    const deltaPctRelativo = (actual: number | null, anterior: number | null) =>
+      actual != null && anterior ? ((actual - anterior) / anterior) * 100 : null
+
+    const comparativas = {
+      headcountActivo: { actual: headcountActivo, anterior: headcountActivoAnioAnterior, deltaPct: deltaPctRelativo(headcountActivo, headcountActivoAnioAnterior) },
+      rotacionAnual: { actual: rotacionAnual, anterior: rotacionAnualAnterior, deltaPct: deltaPctRelativo(rotacionAnual, rotacionAnualAnterior) },
+      antiguedadPromedio: { actual: antiguedadPromedio, anterior: antiguedadPromedioAnioAnterior, deltaPct: deltaPctRelativo(antiguedadPromedio, antiguedadPromedioAnioAnterior) },
+    }
+
     return json({
       headcountActivo,
       bajasDelAnio,
@@ -99,6 +144,7 @@ Deno.serve(async (req) => {
       hcPorPuesto,
       nominaEstimadaMensual,
       serieAnual,
+      comparativas,
     })
   } catch (e) {
     return json({ error: e.message }, 502)

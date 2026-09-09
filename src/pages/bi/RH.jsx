@@ -5,7 +5,7 @@ import { ChevronRight, Plus, Users, RefreshCw, Clock, Wallet, TrendingUp } from 
 import { formatMoney } from '../../utils/formatters'
 import { supabase } from '../../lib/supabase'
 import { llamar, GOLD_RAMP, GOOD, WARNING, CRITICAL, refrescarBI } from './shared'
-import { Card, PageHeader, SectionHeader, LoadingState, ErrorState, DonutGauge } from './ui'
+import { Card, PageHeader, SectionHeader, LoadingState, ErrorState, DonutGauge, DeltaPill } from './ui'
 import Modal from '../../components/ui/Modal'
 
 const AUSENCIAS_ESTILO = [
@@ -78,6 +78,9 @@ function TendenciaHCChart({ serie }) {
               rx={4} fill={GOLD_RAMP[1]} opacity={hover === i ? 0.32 : 0.16}
             />
           ))}
+          {serie.map((s, i) => (
+            <text key={`th-${i}`} x={x(i)} y={yHC(s.hcActivo) - 8} textAnchor="middle" fontSize="11" fontWeight="700" fill={GOLD_RAMP[1]} className="tabular-nums">{s.hcActivo}</text>
+          ))}
 
           <path d={pathSuave(puntosAltas)} fill="none" stroke={GOOD} strokeWidth={2.5} strokeLinecap="round" />
           <path d={pathSuave(puntosBajas)} fill="none" stroke={CRITICAL} strokeWidth={2.5} strokeLinecap="round" />
@@ -141,15 +144,18 @@ function DomainCard({ to, titulo, sub, children }) {
   )
 }
 
-function MetricCard({ icono: Icono, label, value, sub, color = GOLD_RAMP[1] }) {
+function MetricCard({ icono: Icono, label, value, sub, color = GOLD_RAMP[1], delta }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4">
       <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${color}14` }}>
         <Icono size={20} style={{ color }} />
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider truncate">{label}</p>
-        <p className="text-xl font-bold text-gray-900 tabular-nums leading-tight">{value}</p>
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <p className="text-xl font-bold text-gray-900 tabular-nums leading-tight">{value}</p>
+          {delta}
+        </div>
         {sub && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{sub}</p>}
       </div>
     </div>
@@ -237,6 +243,12 @@ export default function BIRH() {
 
   const maxRotacion = rotacion?.areas?.length ? Math.max(...rotacion.areas.map(a => a.rotacion ?? 0), 0.01) : 0.01
 
+  const mesesTranscurridos = new Date().getMonth() + 1
+  const nominaEstimadaYTD = rh ? rh.nominaEstimadaMensual * mesesTranscurridos : 0
+  const pctNominaVsEstimado = nomina && nominaEstimadaYTD > 0
+    ? ((nomina.nominaYtd - nominaEstimadaYTD) / nominaEstimadaYTD) * 100
+    : null
+
   const totalCeldas = asistencia ? asistencia.empleados.length * 7 : 0
   const totalAusencias = asistencia
     ? AUSENCIAS_ESTILO.reduce((s, e) => s + (asistencia.resumenSemana[e.valor] ?? 0), 0)
@@ -264,19 +276,27 @@ export default function BIRH() {
       {rh && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            <MetricCard icono={Users} label="Headcount activo" value={rh.headcountActivo} color={GOLD_RAMP[1]} />
+            <MetricCard
+              icono={Users}
+              label="Headcount activo"
+              value={rh.headcountActivo}
+              color={GOLD_RAMP[1]}
+              delta={<DeltaPill pct={rh.comparativas?.headcountActivo?.deltaPct} suffix=" YoY" compact />}
+            />
             <MetricCard
               icono={RefreshCw}
               label="Rotación del año"
               value={rh.rotacionAnual != null ? `${(rh.rotacionAnual * 100).toFixed(0)}%` : '—'}
               sub={`${rh.bajasDelAnio} bajas este año`}
               color={colorRotacion(rh.rotacionAnual)}
+              delta={<DeltaPill pct={rh.comparativas?.rotacionAnual?.deltaPct} suffix=" YoY" invert compact />}
             />
             <MetricCard
               icono={Clock}
               label="Antigüedad promedio"
               value={rh.antiguedadPromedio != null ? `${rh.antiguedadPromedio.toFixed(1)} años` : '—'}
               color="#8a94a6"
+              delta={<DeltaPill pct={rh.comparativas?.antiguedadPromedio?.deltaPct} suffix=" YoY" compact />}
             />
             <MetricCard
               icono={Wallet}
@@ -284,6 +304,7 @@ export default function BIRH() {
               value={nomina ? formatMoney(nomina.nominaYtd) : '—'}
               sub={nomina?.ultimoPago ? `último: ${nomina.ultimoPago.fecha}` : 'sin registros aún'}
               color={GOOD}
+              delta={<DeltaPill pct={pctNominaVsEstimado} suffix=" vs. estimado" invert compact />}
             />
             <MetricCard
               icono={TrendingUp}
