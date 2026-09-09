@@ -5,6 +5,7 @@ import { formatMoney } from '../../utils/formatters'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useHistorial } from '../../hooks/useHistorial'
+import { useAuth } from '../../context/AuthContext'
 import { llamar, refrescarBI, GOOD, WARNING, CRITICAL, GOLD_RAMP } from './shared'
 import { Card, PageHeader, KpiTile, DeltaPill, LoadingState, ErrorState, DonutGauge, SemicircleGauge, StackedUrgencyBar } from './ui'
 
@@ -161,18 +162,22 @@ export default function BIOverview() {
   const [loading, setLoading] = useState(true)
   const [actualizado, setActualizado] = useState(Date.now())
   const { data: historialPlu } = useHistorial(2)
+  const { profile } = useAuth()
+  const esOwner = profile?.rol === 'owner'
+  const puede = seccion => esOwner || profile?.permisos?.[seccion] === true
 
   function cargar() {
     setLoading(true)
+    const nada = Promise.resolve(null)
     Promise.allSettled([
-      llamar('resumen-ventas'),
-      llamar('resumen-ventas-anual'),
-      llamar('resumen-negocio'),
-      llamar('resumen-pagos'),
-      llamar('resumen-rh'),
-      llamar('resumen-financiero'),
-      llamar('tendencia-cierre'),
-      llamar('ritmo-gasto'),
+      puede('ventas') ? llamar('resumen-ventas') : nada,
+      puede('ventas') ? llamar('resumen-ventas-anual') : nada,
+      (puede('proveedores') || puede('presupuesto')) ? llamar('resumen-negocio') : nada,
+      puede('pagos') ? llamar('resumen-pagos') : nada,
+      puede('rh') ? llamar('resumen-rh') : nada,
+      puede('pnl') ? llamar('resumen-financiero') : nada,
+      puede('pnl') ? llamar('tendencia-cierre') : nada,
+      puede('pagos') ? llamar('ritmo-gasto') : nada,
     ]).then(([r1, r2, r3, r4, r5, r6, r7, r8]) => {
       if (r1.status === 'fulfilled') setVentas(r1.value)
       if (r2.status === 'fulfilled') setAnual(r2.value)
@@ -189,7 +194,7 @@ export default function BIOverview() {
     })
   }
 
-  useEffect(cargar, [])
+  useEffect(cargar, [profile])
 
   function refrescar() {
     refrescarBI()
@@ -276,8 +281,9 @@ export default function BIOverview() {
       {error && <ErrorState message={error} />}
 
       {/* ── KPI hero row ── */}
+      {(puede('ventas') || puede('presupuesto') || puede('pagos') || puede('rh')) && (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
-        {ayer && (
+        {puede('ventas') && ayer && (
           <KpiTile
             label="Venta neta de ayer"
             value={formatMoney(ayer.ventaNeta)}
@@ -285,7 +291,7 @@ export default function BIOverview() {
             delta={<DeltaPill pct={ayer.diferenciaPct} />}
           />
         )}
-        {mtd && (
+        {puede('ventas') && mtd && (
           <KpiTile
             label="Venta neta MTD"
             value={formatMoney(mtd.ventaNeta)}
@@ -298,7 +304,7 @@ export default function BIOverview() {
             }
           />
         )}
-        {pctPresupuesto != null && (
+        {puede('presupuesto') && pctPresupuesto != null && (
           <KpiTile
             label="% Presupuesto usado"
             value={`${(pctPresupuesto * 100).toFixed(0)}%`}
@@ -316,7 +322,7 @@ export default function BIOverview() {
             }
           />
         )}
-        {pagos && (
+        {puede('pagos') && pagos && (
           <KpiTile
             label="C×P pendientes"
             value={formatMoney(pagos.totalPendiente)}
@@ -332,7 +338,7 @@ export default function BIOverview() {
             }
           />
         )}
-        {rh && (
+        {puede('rh') && rh && (
           <KpiTile
             label="Headcount activo"
             value={rh.headcountActivo}
@@ -341,10 +347,12 @@ export default function BIOverview() {
           />
         )}
       </div>
+      )}
 
       {/* ── Ventas + Presupuesto ── */}
+      {(puede('ventas') || puede('presupuesto')) && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {anual?.serie && (
+        {puede('ventas') && anual?.serie && (
           <DomainCard
             to="/ventas"
             titulo="Ventas"
@@ -355,7 +363,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {negocio?.presupuesto && (
+        {puede('presupuesto') && negocio?.presupuesto && (
           <DomainCard to="/presupuesto" titulo="Presupuesto" sub={`Uso vs. límite por categoría · ${format(new Date(negocio.presupuesto.mes), 'MMMM', { locale: es })}`}>
             <div>
               <div className="flex items-center justify-center gap-6 py-1 mb-6">
@@ -388,10 +396,12 @@ export default function BIOverview() {
           </DomainCard>
         )}
       </div>
+      )}
 
       {/* ── Proveedores + Pagos + RH ── */}
+      {(puede('proveedores') || puede('pagos') || puede('rh')) && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {negocio?.proveedores && (
+        {puede('proveedores') && negocio?.proveedores && (
           <DomainCard to="/proveedores" titulo="Proveedores" sub={`Top ${Math.min(5, negocio.proveedores.top.length)} por gasto · 30 días`}>
             <div className="space-y-2.5 mb-4">
               {negocio.proveedores.top.slice(0, 5).map((p, i) => (
@@ -420,7 +430,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {pagos && (
+        {puede('pagos') && pagos && (
           <DomainCard to="/pagos" titulo="Cuentas por pagar" sub="Urgencia de cobro pendiente">
             <p className="text-2xl font-bold text-gray-900 tabular-nums mb-1">{formatMoney(pagos.totalPendiente)}</p>
             <p className="text-xs text-gray-400 mb-4">total por liquidar</p>
@@ -453,7 +463,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {rh && (
+        {puede('rh') && rh && (
           <DomainCard to="/rh" titulo="Recursos Humanos" sub="Headcount · nómina estimada">
             <div className="flex items-baseline justify-between mb-4">
               <div>
@@ -483,8 +493,9 @@ export default function BIOverview() {
           </DomainCard>
         )}
       </div>
+      )}
 
-      {ritmo && (
+      {puede('pagos') && ritmo && (
         <DomainCard to="/pagos/ritmo" titulo="Ritmo de gasto" sub={`Día ${ritmo.diaCorte} de ${ritmo.diasDelMes} · gasto real vs. ritmo ideal`}>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3 flex-shrink-0">
@@ -512,7 +523,9 @@ export default function BIOverview() {
       )}
 
       {/* ── Top PLU + Financiero ── */}
+      {(puede('ventas') || puede('pnl') || puede('rh')) && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        {puede('ventas') && (
         <DomainCard to="/ventas/plu" titulo="Top PLU" sub="Productos más vendidos · mes en curso">
           {topPlu.length === 0 ? (
             <p className="text-xs text-gray-300 py-4">Cargando...</p>
@@ -532,8 +545,9 @@ export default function BIOverview() {
             </div>
           )}
         </DomainCard>
+        )}
 
-        {financiero && (
+        {puede('pnl') && financiero && (
           <DomainCard to="/pnl" titulo="Panorama financiero" sub="Margen bruto · venta neta YTD" span={2}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center py-2">
               <div className="min-w-0 flex flex-col items-center">
@@ -572,8 +586,9 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
+        {(puede('pnl') || puede('rh')) && (
         <div className="col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {cierre && (
+          {puede('pnl') && cierre && (
             <DomainCard
               to="/pnl/tendencia-cierre"
               titulo="Tendencia de cierre"
@@ -595,6 +610,7 @@ export default function BIOverview() {
             </DomainCard>
           )}
 
+          {puede('rh') && (
           <DomainCard
             to="/rh/reporte-semanal"
             titulo="Reporte semanal"
@@ -604,8 +620,11 @@ export default function BIOverview() {
               Venta vs. promedio y YoY, gasto por categoría, pagos fuertes y movimientos de RH de la semana — navega otras semanas y exporta a PDF.
             </p>
           </DomainCard>
+          )}
         </div>
+        )}
       </div>
+      )}
     </div>
   )
 }
