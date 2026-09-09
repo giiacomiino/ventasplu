@@ -9,14 +9,21 @@ const CATEGORIA_ALMACEN = 'INSUMOS'
 //
 // Cualquiera con acceso a Pagos o Compras puede registrar aquí. Quien tenga
 // marcado "solo insumos" (típicamente Almacén, que solo recibe materia
-// prima) solo puede hacerlo con proveedores de categoría INSUMOS. El
-// proveedor debe existir ya en el catálogo nativo `proveedores` — no se
-// crean proveedores nuevos desde aquí (el frontend solo deja elegir del
-// catálogo, para evitar errores de dedo; esto lo refuerza server-side).
+// prima) solo puede hacerlo con proveedores de categoría INSUMOS. RH
+// también puede registrar aquí, pero únicamente pagos de nómina (proveedor
+// "Fonda La Trattoria", categoría NOMINA fija) — es como se registra el
+// pago de nómina desde /rh, reforzado server-side para que no dependa de
+// que el frontend mande los valores correctos. El proveedor debe existir
+// ya en el catálogo nativo `proveedores` — no se crean proveedores nuevos
+// desde aquí (el frontend solo deja elegir del catálogo, para evitar
+// errores de dedo; esto lo refuerza server-side).
+const PROVEEDOR_NOMINA = 'fonda la trattoria'
+const CATEGORIA_NOMINA = 'NOMINA'
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requirePermiso(req, ['pagos', 'compras'])
+  const user = await requirePermiso(req, ['pagos', 'compras', 'rh'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const body = await req.json().catch(() => ({}))
@@ -29,6 +36,11 @@ Deno.serve(async (req) => {
   const soloInsumos = user.rol !== 'owner' && user.permisos?.compras_solo_insumos === true
   if (soloInsumos && String(categoria).toUpperCase() !== CATEGORIA_ALMACEN) {
     return json({ error: 'Solo puedes registrar facturas de proveedores de insumos' }, 403)
+  }
+
+  const soloNomina = user.rol !== 'owner' && !user.permisos?.pagos && !user.permisos?.compras
+  if (soloNomina && (String(categoria).toUpperCase() !== CATEGORIA_NOMINA || String(proveedor).trim().toLowerCase() !== PROVEEDOR_NOMINA)) {
+    return json({ error: 'Con este permiso solo puedes registrar pagos de nómina' }, 403)
   }
 
   try {

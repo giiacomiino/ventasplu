@@ -186,10 +186,19 @@ function ModalRegistrarPago({ onClose, onGuardado }) {
     setGuardando(true)
     setError('')
     try {
-      const { error } = await supabase.functions.invoke('rh-pagos-nomina', {
-        body: { action: 'create', fechaPago: fecha, monto: Number(monto) },
+      const { error } = await supabase.functions.invoke('crear-factura', {
+        body: {
+          proveedor: 'Fonda La Trattoria',
+          categoria: 'NOMINA',
+          montoSinIva: Number(monto),
+          descripcion: 'Pago de nómina',
+          fechaIngreso: fecha,
+        },
       })
-      if (error) throw new Error(error.message)
+      if (error) {
+        const detalle = await error.context?.json?.().catch(() => null)
+        throw new Error(detalle?.error || error.message)
+      }
       refrescarBI()
       onGuardado()
     } catch (e) {
