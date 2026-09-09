@@ -6,6 +6,7 @@ import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso } fr
 // después. El periodo de cada empleado corre por su aniversario de
 // ingreso, no por año calendario.
 const DIAS_VACACIONES_LFT = [12, 14, 16, 18, 20]
+const ESTADOS_AUSENCIA = ['descanso', 'vacaciones', 'falta', 'incapacidad', 'permiso']
 
 function diasVacacionesPorAnio(anioServicio: number): number {
   if (anioServicio <= 0) return 0
@@ -51,6 +52,15 @@ Deno.serve(async (req) => {
       bubbleGetAll(bubbleUrl, bubbleToken, 'Puestos', conOrg()),
     ])
 
+    const ahora = new Date()
+    const anio = ahora.getUTCFullYear()
+    const inicioAnio = new Date(Date.UTC(anio, 0, 1))
+    const inicioAnioStr = fechaISO(inicioAnio)
+    const finAnioStr = `${anio}-12-31`
+
+    // Vacaciones tomadas: se necesita el histórico completo porque el
+    // periodo de cada empleado corre por su aniversario, no por año
+    // calendario, y puede pisar el año anterior.
     const { data: vacacionesTomadas, error: errorVac } = await admin
       .from('rh_asistencias')
       .select('empleado_bubble_id, fecha')
@@ -63,11 +73,28 @@ Deno.serve(async (req) => {
       vacacionesPorEmpleado.get(v.empleado_bubble_id)!.push(v.fecha)
     }
 
+    // Ausencias del año en curso (todas las razones) para el detalle del
+    // colaborador — a diferencia de vacacionesPorEmpleado, esto sí se
+    // acota al año calendario porque es informativo, no un saldo legal.
+    const { data: asistenciasAnio, error: errorAsis } = await admin
+      .from('rh_asistencias')
+      .select('empleado_bubble_id, estado')
+      .gte('fecha', inicioAnioStr)
+      .lte('fecha', finAnioStr)
+    if (errorAsis) return json({ error: errorAsis.message }, 400)
+
+    const asistenciaAnioPorEmpleado = new Map<string, Record<string, number>>()
+    for (const r of asistenciasAnio ?? []) {
+      if (!asistenciaAnioPorEmpleado.has(r.empleado_bubble_id)) {
+        asistenciaAnioPorEmpleado.set(r.empleado_bubble_id, { descanso: 0, vacaciones: 0, falta: 0, incapacidad: 0, permiso: 0 })
+      }
+      const acc = asistenciaAnioPorEmpleado.get(r.empleado_bubble_id)!
+      if (r.estado in acc) acc[r.estado] += 1
+    }
+
     const areaPorId = new Map(areas.map((a: any) => [a._id, a['NombreÁrea']]))
     const puestoPorId = new Map(puestos.map((p: any) => [p._id, p.NombrePuesto]))
-
-    const ahora = new Date()
-    const inicioAnio = new Date(Date.UTC(ahora.getUTCFullYear(), 0, 1))
+    const sueldoPorPuestoId = new Map(puestos.map((p: any) => [p._id, Number(p.SuedoDiario) || 0]))
 
     const nombreArea = (e: any) => areaPorId.get(e['Área']) ?? 'Sin área'
     const nombrePuesto = (e: any) => puestoPorId.get(e.Puesto) ?? 'Sin puesto'
@@ -76,6 +103,8 @@ Deno.serve(async (req) => {
       : 0
     const esBajaDelAnio = (e: any) =>
       e.EstatusEmpleado === 'Baja' && e.FechaSalida && new Date(e.FechaSalida) >= inicioAnio
+    const costoMensualDe = (e: any) =>
+      e.EstatusEmpleado === 'Activo' ? (sueldoPorPuestoId.get(e.Puesto) ?? 0) * 30 : 0
 
     const vacacionesDe = (e: any) => {
       if (e.EstatusEmpleado !== 'Activo' || !e.FechaIngreso) return null
@@ -97,6 +126,7 @@ Deno.serve(async (req) => {
       const activos = empleadosArea.filter((e: any) => e.EstatusEmpleado === 'Activo')
       const bajasDelAnio = empleadosArea.filter(esBajaDelAnio).length
       const rotacion = activos.length > 0 ? bajasDelAnio / activos.length : null
+      const costoMensual = empleadosArea.reduce((s, e) => s + costoMensualDe(e), 0)
 
       const porPuestoMap = new Map<string, any[]>()
       for (const e of empleadosArea) {
@@ -112,23 +142,31 @@ Deno.serve(async (req) => {
           activos: activosPuesto.length,
           bajasDelAnio: bajasPuesto,
           rotacion: activosPuesto.length > 0 ? bajasPuesto / activosPuesto.length : null,
+          costoMensual: empleadosPuesto.reduce((s, e) => s + costoMensualDe(e), 0),
         }
       }).sort((a, b) => b.activos - a.activos)
 
       const colaboradores = empleadosArea
-        .map((e: any) => ({
-          nombre: e.NombreEmpleado || 'Sin nombre',
-          puesto: nombrePuesto(e),
-          antiguedadMeses: antiguedadMeses(e),
-          estatus: e.EstatusEmpleado || 'Desconocido',
-          vacaciones: vacacionesDe(e),
-        }))
+        .map((e: any) => {
+          const ausenciasAnio = asistenciaAnioPorEmpleado.get(e._id) ?? { descanso: 0, vacaciones: 0, falta: 0, incapacidad: 0, permiso: 0 }
+          return {
+            nombre: e.NombreEmpleado || 'Sin nombre',
+            puesto: nombrePuesto(e),
+            estatus: e.EstatusEmpleado || 'Desconocido',
+            fechaIngreso: e.FechaIngreso ?? null,
+            fechaSalida: e.FechaSalida ?? null,
+            antiguedadMeses: antiguedadMeses(e),
+            costoMensual: costoMensualDe(e),
+            vacaciones: vacacionesDe(e),
+            ausenciasAnio,
+          }
+        })
         .sort((a, b) => b.antiguedadMeses - a.antiguedadMeses)
 
-      return { area, activos: activos.length, bajasDelAnio, rotacion, porPuesto, colaboradores }
+      return { area, activos: activos.length, bajasDelAnio, rotacion, costoMensual, porPuesto, colaboradores }
     }).sort((a, b) => b.activos - a.activos)
 
-    return json({ areas: areasRotacion })
+    return json({ areas: areasRotacion, anio })
   } catch (e) {
     return json({ error: e.message }, 502)
   }
