@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, X, Users, RefreshCw, Wallet, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatMoney } from '../../utils/formatters'
 import { llamar, CRITICAL, GOOD, GOLD_RAMP, WARNING } from './shared'
-import { Card, PageHeader, KpiTile, LoadingState, ErrorState, EmptyState } from './ui'
+import { Card, PageHeader, SectionHeader, LoadingState, ErrorState, EmptyState } from './ui'
 import Modal from '../../components/ui/Modal'
 
 function colorRotacion(pct) {
@@ -20,11 +20,62 @@ function fechaCorta(iso) {
   try { return format(new Date(iso), 'd MMM yyyy', { locale: es }) } catch { return '—' }
 }
 
+function agruparPorPuesto(colaboradores) {
+  const m = new Map()
+  for (const c of colaboradores) {
+    if (!m.has(c.puesto)) m.set(c.puesto, [])
+    m.get(c.puesto).push(c)
+  }
+  return [...m.entries()].map(([titulo, lista]) => ({ titulo, colaboradores: lista }))
+}
+
+function MetricCard({ icono: Icono, label, value, sub, color = GOLD_RAMP[1] }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4">
+      <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${color}14` }}>
+        <Icono size={20} style={{ color }} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider truncate">{label}</p>
+        <p className="text-xl font-bold text-gray-900 tabular-nums leading-tight">{value}</p>
+        {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+      </div>
+    </div>
+  )
+}
+
 function FilaClicable({ onClick, children }) {
   return (
     <tr onClick={onClick} className="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 transition-colors group">
       {children}
     </tr>
+  )
+}
+
+function ListaNombres({ grupos, onClickNombre }) {
+  return (
+    <Card>
+      <SectionHeader title="Colaboradores" sub="Click en un nombre para ver su detalle completo" />
+      <div className="space-y-4">
+        {grupos.map(g => (
+          <div key={g.titulo}>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{g.titulo} · {g.colaboradores.length}</p>
+            <div className="flex flex-wrap gap-2">
+              {g.colaboradores.map((c, i) => (
+                <button
+                  key={`${c.nombre}-${i}`}
+                  onClick={() => onClickNombre(c, g.titulo)}
+                  className="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-xs font-semibold text-gray-700 transition-colors"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: c.estatus === 'Activo' ? GOOD : '#d1d5db' }} />
+                  {c.nombre}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   )
 }
 
@@ -136,8 +187,8 @@ export default function BIRHRotacion() {
     setPuestoSel(nombrePuesto)
     setVista('colaboradores')
   }
-  function abrirColaborador(c) {
-    setColaboradorAbierto({ ...c, area: areaSel })
+  function abrirColaborador(c, areaNombre) {
+    setColaboradorAbierto({ ...c, area: areaNombre ?? areaSel })
   }
 
   const totales = datos?.areas?.reduce((acc, a) => ({
@@ -145,6 +196,9 @@ export default function BIRHRotacion() {
     bajasDelAnio: acc.bajasDelAnio + a.bajasDelAnio,
     costoMensual: acc.costoMensual + a.costoMensual,
   }), { activos: 0, bajasDelAnio: 0, costoMensual: 0 })
+
+  const gruposAreas = datos?.areas?.map(a => ({ titulo: a.area, colaboradores: a.colaboradores })) ?? []
+  const gruposPuestos = area ? agruparPorPuesto(area.colaboradores) : []
 
   return (
     <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1600px] mx-auto space-y-8">
@@ -187,10 +241,10 @@ export default function BIRHRotacion() {
       {!loading && vista === 'areas' && datos && (
         <>
           {totales && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <KpiTile label="Colaboradores activos" value={totales.activos} />
-              <KpiTile label="Bajas del año" value={totales.bajasDelAnio} />
-              <KpiTile label="Costo mensual total" value={formatMoney(totales.costoMensual)} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <MetricCard icono={Users} label="Colaboradores activos" value={totales.activos} color={GOLD_RAMP[1]} />
+              <MetricCard icono={AlertTriangle} label="Bajas del año" value={totales.bajasDelAnio} color={CRITICAL} />
+              <MetricCard icono={Wallet} label="Costo mensual total" value={formatMoney(totales.costoMensual)} color={GOOD} />
             </div>
           )}
           <Card padded={false}>
@@ -223,19 +277,23 @@ export default function BIRHRotacion() {
               </table>
             )}
           </Card>
+
+          {gruposAreas.length > 0 && <ListaNombres grupos={gruposAreas} onClickNombre={abrirColaborador} />}
         </>
       )}
 
       {!loading && vista === 'puestos' && area && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <KpiTile label="Colaboradores activos" value={area.activos} />
-            <KpiTile
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <MetricCard icono={Users} label="Colaboradores activos" value={area.activos} color={GOLD_RAMP[1]} />
+            <MetricCard
+              icono={RefreshCw}
               label="Rotación"
               value={area.rotacion != null ? `${(area.rotacion * 100).toFixed(1)}%` : '—'}
               sub={`${area.bajasDelAnio} bajas del año`}
+              color={colorRotacion(area.rotacion)}
             />
-            <KpiTile label="Costo mensual" value={formatMoney(area.costoMensual)} />
+            <MetricCard icono={Wallet} label="Costo mensual" value={formatMoney(area.costoMensual)} color={GOOD} />
           </div>
           <Card padded={false}>
             <table className="w-full text-sm">
@@ -263,19 +321,23 @@ export default function BIRHRotacion() {
               </tbody>
             </table>
           </Card>
+
+          {gruposPuestos.length > 0 && <ListaNombres grupos={gruposPuestos} onClickNombre={c => abrirColaborador(c, areaSel)} />}
         </>
       )}
 
       {!loading && vista === 'colaboradores' && area && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <KpiTile label="Colaboradores" value={puestoInfo?.activos ?? colaboradoresDelPuesto.length} />
-            <KpiTile
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <MetricCard icono={Users} label="Colaboradores" value={puestoInfo?.activos ?? colaboradoresDelPuesto.length} color={GOLD_RAMP[1]} />
+            <MetricCard
+              icono={RefreshCw}
               label="Rotación"
               value={puestoInfo?.rotacion != null ? `${(puestoInfo.rotacion * 100).toFixed(1)}%` : '—'}
               sub={`${puestoInfo?.bajasDelAnio ?? 0} bajas del año`}
+              color={colorRotacion(puestoInfo?.rotacion)}
             />
-            <KpiTile label="Costo mensual" value={formatMoney(puestoInfo?.costoMensual ?? 0)} />
+            <MetricCard icono={Wallet} label="Costo mensual" value={formatMoney(puestoInfo?.costoMensual ?? 0)} color={GOOD} />
           </div>
           <Card padded={false}>
             {colaboradoresDelPuesto.length === 0 ? (
