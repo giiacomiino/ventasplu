@@ -194,7 +194,8 @@ export function ModalDetalleFactura({ factura: f, onClose, onMarcarPagada }) {
 }
 
 // Searchbox de proveedor: solo deja elegir uno de los que ya existen en el
-// catálogo (filtrado por rol desde el backend — Almacén solo ve insumos).
+// catálogo (filtrado desde el backend — quien tenga "solo insumos" marcado
+// en permisos solo ve proveedores de esa categoría).
 // A propósito NO permite texto libre — es justo para evitar errores de
 // dedo al registrar una factura. Si lo que se escribió no calza con un
 // proveedor real, onSelect(null) y no se puede enviar el formulario.
@@ -265,18 +266,18 @@ export function BuscadorProveedor({ catalogo, value, onSelect, placeholder }) {
 }
 
 // Popup de "Registrar factura" — se usa igual desde Pagos y desde Compras.
-// El comportamiento depende del rol de quien lo abre: Almacén solo ve
-// proveedores de insumos (categoría fija), Pagos/owner/admin ven el
-// catálogo completo y eligen categoría libremente. El proveedor solo se
+// El comportamiento depende de permisos.compras_solo_insumos: quien lo
+// tenga marcado solo ve proveedores de insumos (categoría fija); el resto
+// ve el catálogo completo y elige categoría libremente. El proveedor solo se
 // puede elegir del catálogo (no texto libre) para evitar errores de dedo.
 export function ModalRegistrarFactura({ onClose, onRegistrada }) {
   const { profile } = useAuth()
-  const esAlmacen = profile?.rol === 'almacen'
+  const soloInsumos = profile?.rol !== 'owner' && profile?.permisos?.compras_solo_insumos === true
 
   const [catalogo, setCatalogo] = useState([])
   const [form, setForm] = useState({
     proveedor: '',
-    categoria: esAlmacen ? CATEGORIA_ALMACEN : '',
+    categoria: soloInsumos ? CATEGORIA_ALMACEN : '',
     tipoProducto: '',
     montoSinIva: '',
     descripcion: '',
@@ -301,7 +302,7 @@ export function ModalRegistrarFactura({ onClose, onRegistrada }) {
     setForm(f => ({
       ...f,
       proveedor: p.nombre,
-      categoria: esAlmacen ? CATEGORIA_ALMACEN : (p.categoria || f.categoria),
+      categoria: soloInsumos ? CATEGORIA_ALMACEN : (p.categoria || f.categoria),
       tipoProducto: p.tipoProducto ?? f.tipoProducto,
     }))
   }
@@ -314,7 +315,7 @@ export function ModalRegistrarFactura({ onClose, onRegistrada }) {
       const { data, error } = await supabase.functions.invoke('crear-factura', {
         body: {
           proveedor: form.proveedor,
-          categoria: esAlmacen ? CATEGORIA_ALMACEN : form.categoria,
+          categoria: soloInsumos ? CATEGORIA_ALMACEN : form.categoria,
           tipoProducto: form.tipoProducto || null,
           montoSinIva: Number(form.montoSinIva),
           descripcion: form.descripcion || null,
@@ -347,14 +348,14 @@ export function ModalRegistrarFactura({ onClose, onRegistrada }) {
             <label className="block text-xs font-semibold text-gray-500 mb-1">Proveedor</label>
             <BuscadorProveedor
               catalogo={catalogo} value={form.proveedor} onSelect={elegirProveedor}
-              placeholder={esAlmacen ? 'Buscar proveedor de insumos...' : 'Buscar proveedor...'}
+              placeholder={soloInsumos ? 'Buscar proveedor de insumos...' : 'Buscar proveedor...'}
             />
-            {esAlmacen && (
+            {soloInsumos && (
               <p className="text-[11px] text-gray-400 mt-1">Solo proveedores de insumos — si es nuevo, se registra como insumos.</p>
             )}
           </div>
 
-          {esAlmacen ? (
+          {soloInsumos ? (
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Categoría</label>
               <input disabled value="INSUMOS" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500" />

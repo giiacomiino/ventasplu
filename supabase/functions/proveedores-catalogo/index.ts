@@ -4,9 +4,11 @@ import { corsHeaders, json, requirePermiso } from '../_shared/bubble.ts'
 const CATEGORIA_ALMACEN = 'INSUMOS'
 
 // Catálogo de proveedores nativo de VURA BI, para el formulario de
-// Compras. Almacén solo ve proveedores de insumos (es todo lo que puede
-// registrar); Pagos/owner/admin ven el catálogo completo. No se expone
-// días de crédito — es un dato interno solo para calcular fecha de pago.
+// Compras. Quien tenga marcado "Solo proveedores de insumos"
+// (permisos.compras_solo_insumos) solo ve proveedores de insumos — es
+// todo lo que puede registrar; el resto ve el catálogo completo. No se
+// expone días de crédito — es un dato interno solo para calcular fecha
+// de pago.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -19,7 +21,7 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey)
 
     let query = admin.from('proveedores').select('nombre, categoria, tipo_producto').order('nombre')
-    if (user.rol === 'almacen') query = query.eq('categoria', CATEGORIA_ALMACEN)
+    if (user.rol !== 'owner' && user.permisos?.compras_solo_insumos === true) query = query.eq('categoria', CATEGORIA_ALMACEN)
 
     const { data, error } = await query
     if (error) return json({ error: error.message }, 400)
