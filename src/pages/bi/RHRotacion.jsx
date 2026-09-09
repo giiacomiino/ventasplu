@@ -59,16 +59,18 @@ function ListaNombres({ grupos, onClickNombre }) {
       <div className="space-y-4">
         {grupos.map(g => (
           <div key={g.titulo}>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{g.titulo} · {g.colaboradores.length}</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5 pb-2 border-b border-gray-100">
+              {g.titulo} <span className="text-gray-300 font-medium normal-case">· {g.colaboradores.length}</span>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6">
               {g.colaboradores.map((c, i) => (
                 <button
                   key={`${c.nombre}-${i}`}
                   onClick={() => onClickNombre(c, g.titulo)}
-                  className="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-xs font-semibold text-gray-700 transition-colors"
+                  className="flex items-center gap-2 py-1.5 text-left text-sm text-gray-700 hover:text-[#7a6020] font-medium transition-colors min-w-0"
                 >
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: c.estatus === 'Activo' ? GOOD : '#d1d5db' }} />
-                  {c.nombre}
+                  <span className="truncate">{c.nombre}</span>
                 </button>
               ))}
             </div>
