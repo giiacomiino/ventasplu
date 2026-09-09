@@ -1,4 +1,5 @@
-import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso } from '../_shared/bubble.ts'
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso, mapearEmpleadosNativos } from '../_shared/bubble.ts'
 
 // Headcount activo reconstruido a cualquier fecha de corte: quién ya
 // había ingresado y aún no había salido a esa fecha. Se usa tanto para la
@@ -31,16 +32,23 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}))
   const { bubbleUrl, bubbleToken } = bubbleEnv()
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const admin = createClient(supabaseUrl, serviceKey)
 
   try {
-    const [empleados, areas, puestos] = await Promise.all([
+    const [empleadosBubble, areas, puestos, { data: nativos, error: errorNativos }] = await Promise.all([
       bubbleGetAll(bubbleUrl, bubbleToken, 'Empleado', conOrg()),
       bubbleGetAll(bubbleUrl, bubbleToken, 'Área', conOrg()),
       bubbleGetAll(bubbleUrl, bubbleToken, 'Puestos', conOrg()),
+      admin.from('empleados_nativos').select('*'),
     ])
+    if (errorNativos) return json({ error: errorNativos.message }, 400)
+    const empleados = [...empleadosBubble, ...mapearEmpleadosNativos(nativos ?? [])]
 
     const areaPorId = new Map(areas.map((a: any) => [a._id, a['NombreÁrea']]))
     const puestoPorId = new Map(puestos.map((p: any) => [p._id, { nombre: p.NombrePuesto, sueldo: p.SuedoDiario }]))
+    const sueldoDe = (e: any) => e._sueldoNativo ?? puestoPorId.get(e.Puesto)?.sueldo ?? 0
 
     const activos = empleados.filter((e: any) => e.EstatusEmpleado === 'Activo')
     const headcountActivo = activos.length
@@ -61,7 +69,7 @@ Deno.serve(async (req) => {
 
     const porArea = new Map<string, number>()
     for (const e of activos) {
-      const nombre = areaPorId.get(e['Área']) ?? 'Sin área'
+      const nombre = areaPorId.get(e['Área']) ?? e['Área'] ?? 'Sin área'
       porArea.set(nombre, (porArea.get(nombre) ?? 0) + 1)
     }
     const hcPorArea = [...porArea.entries()]
@@ -70,9 +78,8 @@ Deno.serve(async (req) => {
 
     const porPuesto = new Map<string, { headcount: number; sueldo: number }>()
     for (const e of activos) {
-      const info = puestoPorId.get(e.Puesto)
-      const nombre = info?.nombre ?? 'Sin puesto'
-      const actual = porPuesto.get(nombre) ?? { headcount: 0, sueldo: info?.sueldo ?? 0 }
+      const nombre = puestoPorId.get(e.Puesto)?.nombre ?? e.Puesto ?? 'Sin puesto'
+      const actual = porPuesto.get(nombre) ?? { headcount: 0, sueldo: sueldoDe(e) }
       actual.headcount += 1
       porPuesto.set(nombre, actual)
     }

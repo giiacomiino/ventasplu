@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso, mapearEmpleadosNativos } from '../_shared/bubble.ts'
 
 // Días de vacaciones por año de servicio cumplido, Ley Federal del
 // Trabajo (art. 76): 12/14/16/18/20 los primeros 5 años, +2 cada 5 años
@@ -46,11 +46,14 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceKey)
 
   try {
-    const [empleados, areas, puestos] = await Promise.all([
+    const [empleadosBubble, areas, puestos, { data: nativos, error: errorNativos }] = await Promise.all([
       bubbleGetAll(bubbleUrl, bubbleToken, 'Empleado', conOrg()),
       bubbleGetAll(bubbleUrl, bubbleToken, 'Área', conOrg()),
       bubbleGetAll(bubbleUrl, bubbleToken, 'Puestos', conOrg()),
+      admin.from('empleados_nativos').select('*'),
     ])
+    if (errorNativos) return json({ error: errorNativos.message }, 400)
+    const empleados = [...empleadosBubble, ...mapearEmpleadosNativos(nativos ?? [])]
 
     const ahora = new Date()
     const anio = ahora.getUTCFullYear()
@@ -96,15 +99,15 @@ Deno.serve(async (req) => {
     const puestoPorId = new Map(puestos.map((p: any) => [p._id, p.NombrePuesto]))
     const sueldoPorPuestoId = new Map(puestos.map((p: any) => [p._id, Number(p.SuedoDiario) || 0]))
 
-    const nombreArea = (e: any) => areaPorId.get(e['Área']) ?? 'Sin área'
-    const nombrePuesto = (e: any) => puestoPorId.get(e.Puesto) ?? 'Sin puesto'
+    const nombreArea = (e: any) => areaPorId.get(e['Área']) ?? e['Área'] ?? 'Sin área'
+    const nombrePuesto = (e: any) => puestoPorId.get(e.Puesto) ?? e.Puesto ?? 'Sin puesto'
     const antiguedadMeses = (e: any) => e.FechaIngreso
       ? Math.floor((ahora.getTime() - new Date(e.FechaIngreso).getTime()) / (30.44 * 24 * 60 * 60 * 1000))
       : 0
     const esBajaDelAnio = (e: any) =>
       e.EstatusEmpleado === 'Baja' && e.FechaSalida && new Date(e.FechaSalida) >= inicioAnio
     const costoMensualDe = (e: any) =>
-      e.EstatusEmpleado === 'Activo' ? (sueldoPorPuestoId.get(e.Puesto) ?? 0) * 30 : 0
+      e.EstatusEmpleado === 'Activo' ? (e._sueldoNativo ?? sueldoPorPuestoId.get(e.Puesto) ?? 0) * 30 : 0
 
     const vacacionesDe = (e: any) => {
       if (e.EstatusEmpleado !== 'Activo' || !e.FechaIngreso) return null

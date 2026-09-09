@@ -495,3 +495,29 @@ CREATE TABLE IF NOT EXISTS rh_pagos_nomina (
 CREATE INDEX IF NOT EXISTS idx_rh_pagos_nomina_fecha ON rh_pagos_nomina(fecha_pago);
 
 ALTER TABLE rh_pagos_nomina ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
+-- TABLA: empleados_nativos
+-- Arranque de la migración de Empleado fuera de Bubble: los empleados YA
+-- existentes se siguen leyendo de Bubble (solo lectura); los nuevos, de
+-- aquí en adelante, se registran directo aquí. resumen-rh, rh-rotacion y
+-- rh-asistencia fusionan ambas fuentes para que headcount, rotación y la
+-- cuadrícula de asistencia los traten igual. Área/puesto son texto libre
+-- (no hay catálogo nativo de Área/Puestos todavía) — se sugieren desde lo
+-- que ya existe en Bubble + lo que ya se haya capturado aquí.
+-- =============================================
+CREATE TABLE IF NOT EXISTS empleados_nativos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre text NOT NULL,
+  area text NOT NULL,
+  puesto text NOT NULL,
+  sueldo_diario numeric(10,2) NOT NULL CHECK (sueldo_diario >= 0),
+  fecha_ingreso date NOT NULL,
+  fecha_salida date,
+  estatus text NOT NULL DEFAULT 'Activo' CHECK (estatus IN ('Activo','Baja')),
+  registrado_por uuid REFERENCES profiles(id),
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE empleados_nativos ENABLE ROW LEVEL SECURITY;

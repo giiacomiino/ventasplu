@@ -224,6 +224,123 @@ function ModalRegistrarPago({ onClose, onGuardado }) {
   )
 }
 
+function ModalRegistrarEmpleado({ onClose, onGuardado }) {
+  const [catalogos, setCatalogos] = useState(null)
+  const [nombre, setNombre] = useState('')
+  const [area, setArea] = useState('')
+  const [puesto, setPuesto] = useState('')
+  const [fechaIngreso, setFechaIngreso] = useState(new Date().toISOString().slice(0, 10))
+  const [sueldoDiario, setSueldoDiario] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    supabase.functions.invoke('rh-empleados', { body: { action: 'catalogos' } })
+      .then(({ data }) => setCatalogos(data))
+      .catch(() => setCatalogos({ areas: [], puestos: [] }))
+  }, [])
+
+  function elegirPuesto(nombrePuesto) {
+    setPuesto(nombrePuesto)
+    const info = catalogos?.puestos?.find(p => p.nombre === nombrePuesto)
+    if (info) setSueldoDiario(String(Math.round(info.sueldoDiario)))
+  }
+
+  async function guardar() {
+    if (!nombre.trim() || !area.trim() || !puesto.trim() || !sueldoDiario || Number(sueldoDiario) <= 0 || !fechaIngreso) {
+      setError('Completa nombre, área, puesto, fecha de ingreso y sueldo diario')
+      return
+    }
+    setGuardando(true)
+    setError('')
+    try {
+      const { error } = await supabase.functions.invoke('rh-empleados', {
+        body: { action: 'crear', nombre: nombre.trim(), area: area.trim(), puesto: puesto.trim(), sueldoDiario: Number(sueldoDiario), fechaIngreso },
+      })
+      if (error) throw new Error(error.message)
+      refrescarBI()
+      onGuardado()
+    } catch (e) {
+      setError(e.message)
+    }
+    setGuardando(false)
+  }
+
+  return (
+    <Modal onClose={onClose} maxWidth="max-w-2xl">
+      <div className="p-6 max-h-[85vh] overflow-y-auto">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Registrar nuevo empleado</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre completo</label>
+              <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Apellido Apellido Nombre" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Área</label>
+              <input list="rh-areas-existentes" value={area} onChange={e => setArea(e.target.value)} placeholder="Cocina, Comedor..." className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              <datalist id="rh-areas-existentes">
+                {catalogos?.areas?.map(a => <option key={a} value={a} />)}
+              </datalist>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Puesto</label>
+              <input
+                list="rh-puestos-existentes" value={puesto}
+                onChange={e => elegirPuesto(e.target.value)}
+                placeholder="Mesero, Cocinero..."
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
+              <datalist id="rh-puestos-existentes">
+                {catalogos?.puestos?.map(p => <option key={p.nombre} value={p.nombre} />)}
+              </datalist>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Fecha de ingreso</label>
+                <input type="date" value={fechaIngreso} onChange={e => setFechaIngreso(e.target.value)} className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sueldo diario</label>
+                <input type="number" value={sueldoDiario} onChange={e => setSueldoDiario(e.target.value)} placeholder="0.00" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums" />
+              </div>
+            </div>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Sueldos diarios de referencia</p>
+            <div className="border border-gray-100 rounded-lg max-h-64 overflow-y-auto">
+              {!catalogos ? (
+                <p className="text-xs text-gray-300 p-3">Cargando...</p>
+              ) : catalogos.puestos.length === 0 ? (
+                <p className="text-xs text-gray-300 p-3">Sin datos aún.</p>
+              ) : (
+                <table className="w-full text-xs">
+                  <tbody>
+                    {catalogos.puestos.map(p => (
+                      <tr key={p.nombre} className="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50" onClick={() => elegirPuesto(p.nombre)}>
+                        <td className="px-3 py-2 text-gray-600">{p.nombre}</td>
+                        <td className="px-3 py-2 text-right font-bold text-gray-800 tabular-nums">{formatMoney(p.sueldoDiario)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-6">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-50">Cancelar</button>
+          <button onClick={guardar} disabled={guardando} className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[#7a6020] hover:bg-[#5c4718] disabled:opacity-50">
+            {guardando ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function BIRH() {
   const [rh, setRh] = useState(null)
   const [rotacion, setRotacion] = useState(null)
@@ -231,6 +348,7 @@ export default function BIRH() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [modalPago, setModalPago] = useState(false)
+  const [modalEmpleado, setModalEmpleado] = useState(false)
 
   const lunesStr = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
   const { anio, mes } = useMesSeleccionado()
@@ -267,9 +385,14 @@ export default function BIRH() {
         title="Recursos Humanos"
         sub="Headcount, rotación, asistencia y nómina"
         right={
-          <button onClick={() => setModalPago(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#7a6020] text-white rounded-lg text-sm font-semibold hover:bg-[#5c4718] transition-colors shadow-sm">
-            <Plus size={15} /> Registrar Pago Nómina
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setModalEmpleado(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors shadow-sm">
+              <Plus size={15} /> Registrar Nuevo Empleado
+            </button>
+            <button onClick={() => setModalPago(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#7a6020] text-white rounded-lg text-sm font-semibold hover:bg-[#5c4718] transition-colors shadow-sm">
+              <Plus size={15} /> Registrar Pago Nómina
+            </button>
+          </div>
         }
       />
 
@@ -376,6 +499,13 @@ export default function BIRH() {
         <ModalRegistrarPago
           onClose={() => setModalPago(false)}
           onGuardado={() => { setModalPago(false); cargar() }}
+        />
+      )}
+
+      {modalEmpleado && (
+        <ModalRegistrarEmpleado
+          onClose={() => setModalEmpleado(false)}
+          onGuardado={() => { setModalEmpleado(false); cargar() }}
         />
       )}
     </div>

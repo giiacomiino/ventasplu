@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso, mapearEmpleadosNativos } from '../_shared/bubble.ts'
 
 function fechaISO(d: Date) {
   return d.toISOString().slice(0, 10)
@@ -30,11 +30,14 @@ Deno.serve(async (req) => {
       const domingo = dias7[6]
 
       const { bubbleUrl, bubbleToken } = bubbleEnv()
-      const [empleados, areas, puestos] = await Promise.all([
+      const [empleadosBubble, areas, puestos, { data: nativos, error: errorNativos }] = await Promise.all([
         bubbleGetAll(bubbleUrl, bubbleToken, 'Empleado', conOrg()),
         bubbleGetAll(bubbleUrl, bubbleToken, 'Área', conOrg()),
         bubbleGetAll(bubbleUrl, bubbleToken, 'Puestos', conOrg()),
+        admin.from('empleados_nativos').select('*'),
       ])
+      if (errorNativos) return json({ error: errorNativos.message }, 400)
+      const empleados = [...empleadosBubble, ...mapearEmpleadosNativos(nativos ?? [])]
       const activos = empleados.filter((e: any) => e.EstatusEmpleado === 'Activo')
       const areaPorId = new Map(areas.map((a: any) => [a._id, a['NombreÁrea']]))
       const puestoPorId = new Map(puestos.map((p: any) => [p._id, p.NombrePuesto]))
@@ -62,8 +65,8 @@ Deno.serve(async (req) => {
         return {
           empleadoBubbleId: e._id,
           nombre,
-          area: areaPorId.get(e['Área']) ?? 'Sin área',
-          puesto: puestoPorId.get(e.Puesto) ?? 'Sin puesto',
+          area: areaPorId.get(e['Área']) ?? e['Área'] ?? 'Sin área',
+          puesto: puestoPorId.get(e.Puesto) ?? e.Puesto ?? 'Sin puesto',
           dias,
         }
       }).sort((a, b) => a.nombre.localeCompare(b.nombre))

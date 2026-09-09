@@ -201,3 +201,25 @@ export function calcularFechaPago(fechaIngresoISO: string, diasCredito: number |
   base.setUTCDate(base.getUTCDate() + diasCredito)
   return ajustarFinDeSemana(base).toISOString()
 }
+
+// Empleados nativos (registrados desde /rh en la tabla empleados_nativos,
+// no viven en Bubble) se disfrazan con la misma forma que un registro de
+// Empleado de Bubble, para que resumen-rh/rh-rotacion/rh-asistencia no
+// necesiten tratarlos distinto. Área/Puesto llevan el nombre en texto
+// plano en vez de un _id de Bubble — cualquier lookup tipo
+// `areaPorId.get(e['Área'])` no lo va a encontrar, así que en cada lugar
+// que se usa hace falta el fallback `?? e['Área']` / `?? e.Puesto` para
+// usar el texto tal cual como nombre. El sueldo va aparte en
+// `_sueldoNativo` porque no hay un Puesto de Bubble del que sacarlo.
+export function mapearEmpleadosNativos(nativos: any[]) {
+  return nativos.map((e: any) => ({
+    _id: `nativo:${e.id}`,
+    NombreEmpleado: e.nombre,
+    EstatusEmpleado: e.estatus,
+    FechaIngreso: e.fecha_ingreso,
+    FechaSalida: e.fecha_salida,
+    'Área': e.area,
+    Puesto: e.puesto,
+    _sueldoNativo: Number(e.sueldo_diario) || 0,
+  }))
+}
