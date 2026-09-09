@@ -1,4 +1,4 @@
-import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, isoWeekday, requirePermiso } from '../_shared/bubble.ts'
+import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, isoWeekday, requireRole } from '../_shared/bubble.ts'
 
 // Reporte semanal (lunes a domingo) para dirección: venta vs. promedio y
 // YoY, gasto por categoría vs. su promedio semanal histórico, facturas
@@ -8,7 +8,7 @@ import { corsHeaders, json, bubbleEnv, bubbleGet, bubbleGetAllFast, conOrg, isoW
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const user = await requirePermiso(req, 'rh')
+  const user = await requireRole(req, ['owner'])
   if (!user) return json({ error: 'No autorizado' }, 401)
 
   const { lunes } = await req.json().catch(() => ({}))

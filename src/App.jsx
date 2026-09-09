@@ -171,7 +171,6 @@ export default function App() {
         <Route element={<SoloPermiso seccion="rh" />}>
           <Route path="/rh/rotacion" element={<BIRHRotacion />} />
           <Route path="/rh/asistencia" element={<BIRHAsistencia />} />
-          <Route path="/rh/reporte-semanal" element={<BIReporteSemanal />} />
         </Route>
 
         <Route element={<SoloPermiso seccion="compras" />}>
@@ -180,6 +179,7 @@ export default function App() {
 
         <Route element={<SoloOwner />}>
           <Route path="/usuarios" element={<Usuarios />} />
+          <Route path="/rh/reporte-semanal" element={<BIReporteSemanal />} />
         </Route>
       </Route>
     </Routes>

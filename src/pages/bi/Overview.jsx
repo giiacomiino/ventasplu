@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { ChevronRight, AlertTriangle, CheckCircle2, Clock, RefreshCw, Gauge } from 'lucide-react'
 import { formatMoney } from '../../utils/formatters'
 import { format } from 'date-fns'
@@ -244,6 +244,17 @@ export default function BIOverview() {
     topPlu = flat.sort((a, b) => b.monto - a.monto).slice(0, 3)
   }
 
+  // Si a alguien le corresponde ver un solo módulo (y no tiene 'dashboard',
+  // que es la señal explícita de querer la vista consolidada), mejor
+  // mandarlo directo al overview de ese módulo — ya está diseñado
+  // completo para ese caso, en vez de mostrarle una versión resumida y
+  // suelta dentro del panel general.
+  const RUTA_MODULO = { ventas: '/ventas', pagos: '/pagos', rh: '/rh', proveedores: '/proveedores', presupuesto: '/presupuesto', pnl: '/pnl' }
+  const modulosActivos = profile ? Object.keys(RUTA_MODULO).filter(m => puede(m)) : []
+  if (profile && !esOwner && !puede('dashboard') && modulosActivos.length === 1) {
+    return <Navigate to={RUTA_MODULO[modulosActivos[0]]} replace />
+  }
+
   return (
     <div className="w-full px-4 py-4 sm:px-8 sm:py-8 max-w-[1700px] mx-auto space-y-6">
       <PageHeader
@@ -287,7 +298,7 @@ export default function BIOverview() {
 
       {/* ── KPI hero row ── */}
       {(puedeVer('ventas') || puedeVer('presupuesto') || puedeVer('pagos') || puedeVer('rh')) && (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+      <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
         {puedeVer('ventas') && ayer && (
           <KpiTile
             label="Venta neta de ayer"
@@ -591,7 +602,7 @@ export default function BIOverview() {
           </DomainCard>
         )}
 
-        {(puedeVer('pnl') || puedeVer('rh')) && (
+        {(puedeVer('pnl') || esOwner) && (
         <div className="col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
           {puedeVer('pnl') && cierre && (
             <DomainCard
@@ -615,7 +626,7 @@ export default function BIOverview() {
             </DomainCard>
           )}
 
-          {puedeVer('rh') && (
+          {esOwner && (
           <DomainCard
             to="/rh/reporte-semanal"
             titulo="Reporte semanal"
