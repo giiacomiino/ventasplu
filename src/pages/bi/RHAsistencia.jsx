@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { WARNING, CRITICAL, GOLD_RAMP, refrescarBI } from './shared'
 import { Card, PageHeader, KpiTile, LoadingState, ErrorState, EmptyState } from './ui'
@@ -72,6 +72,16 @@ export default function BIRHAsistencia() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [guardandoCelda, setGuardandoCelda] = useState(null)
+  const [colapsadas, setColapsadas] = useState(new Set())
+
+  function toggleArea(area) {
+    setColapsadas(prev => {
+      const next = new Set(prev)
+      if (next.has(area)) next.delete(area)
+      else next.add(area)
+      return next
+    })
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -162,45 +172,51 @@ export default function BIRHAsistencia() {
                 </tr>
               </thead>
               <tbody>
-                {grupos.map(grupo => (
-                  <Fragment key={`area-${grupo.area}`}>
-                    <tr className="bg-gray-50">
-                      <td colSpan={9} className="px-4 py-2 text-[11px] font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
-                        {grupo.area} · {grupo.total}
-                      </td>
-                    </tr>
-                    {grupo.puestos.map(p => (
-                      <Fragment key={`puesto-${grupo.area}-${p.puesto}`}>
-                        <tr>
-                          <td colSpan={9} className="px-6 py-1.5 text-[11px] font-semibold text-gray-400 sticky left-0 bg-white">
-                            {p.puesto}
-                          </td>
-                        </tr>
-                        {p.empleados.map(emp => (
-                          <tr key={emp.empleadoBubbleId} className="border-b border-gray-50 last:border-0">
-                            <td className="pl-9 pr-4 py-2 sticky left-0 bg-white">
-                              <p className="font-medium text-gray-700 truncate max-w-[170px]">{emp.nombre}</p>
-                            </td>
-                            {emp.dias.map(d => (
-                              <td key={d.fecha} className="px-1.5 py-2">
-                                <CeldaAsistencia
-                                  estado={d.estado}
-                                  guardando={guardandoCelda === `${emp.empleadoBubbleId}:${d.fecha}`}
-                                  onChange={estado => cambiarEstado(emp, d.fecha, estado)}
-                                />
-                              </td>
-                            ))}
-                            <td className="px-3 py-2 text-center">
-                              <span className="text-xs font-bold text-gray-600 tabular-nums">
-                                {emp.saldoVacaciones.restantes}/{emp.saldoVacaciones.correspondientes}
-                              </span>
+                {grupos.map(grupo => {
+                  const colapsada = colapsadas.has(grupo.area)
+                  return (
+                    <Fragment key={`area-${grupo.area}`}>
+                      <tr className="bg-gray-50 cursor-pointer select-none" onClick={() => toggleArea(grupo.area)}>
+                        <td colSpan={9} className="px-4 py-2 text-[11px] font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
+                          <span className="inline-flex items-center gap-1.5">
+                            <ChevronDown size={13} className={`transition-transform ${colapsada ? '-rotate-90' : ''}`} />
+                            {grupo.area} · {grupo.total}
+                          </span>
+                        </td>
+                      </tr>
+                      {!colapsada && grupo.puestos.map(p => (
+                        <Fragment key={`puesto-${grupo.area}-${p.puesto}`}>
+                          <tr>
+                            <td colSpan={9} className="px-6 py-1.5 text-[11px] font-semibold text-gray-400 sticky left-0 bg-white">
+                              {p.puesto}
                             </td>
                           </tr>
-                        ))}
-                      </Fragment>
-                    ))}
-                  </Fragment>
-                ))}
+                          {p.empleados.map(emp => (
+                            <tr key={emp.empleadoBubbleId} className="border-b border-gray-50 last:border-0">
+                              <td className="pl-9 pr-4 py-2 sticky left-0 bg-white">
+                                <p className="font-medium text-gray-700 truncate max-w-[170px]">{emp.nombre}</p>
+                              </td>
+                              {emp.dias.map(d => (
+                                <td key={d.fecha} className="px-1.5 py-2">
+                                  <CeldaAsistencia
+                                    estado={d.estado}
+                                    guardando={guardandoCelda === `${emp.empleadoBubbleId}:${d.fecha}`}
+                                    onChange={estado => cambiarEstado(emp, d.fecha, estado)}
+                                  />
+                                </td>
+                              ))}
+                              <td className="px-3 py-2 text-center">
+                                <span className="text-xs font-bold text-gray-600 tabular-nums">
+                                  {emp.saldoVacaciones.restantes}/{emp.saldoVacaciones.correspondientes}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
