@@ -254,22 +254,27 @@ function ModalRegistrarEmpleado({ onClose, onGuardado }) {
       .catch(() => setCatalogos({ areas: [], puestos: [] }))
   }, [])
 
+  const puestoExistente = catalogos?.puestos?.find(p => p.nombre === puesto)
+
   function elegirPuesto(nombrePuesto) {
     setPuesto(nombrePuesto)
     const info = catalogos?.puestos?.find(p => p.nombre === nombrePuesto)
-    if (info) setSueldoDiario(String(Math.round(info.sueldoDiario)))
+    setSueldoDiario(info ? String(info.sueldoDiario) : '')
   }
 
   async function guardar() {
-    if (!nombre.trim() || !area.trim() || !puesto.trim() || !sueldoDiario || Number(sueldoDiario) <= 0 || !fechaIngreso) {
-      setError('Completa nombre, área, puesto, fecha de ingreso y sueldo diario')
+    const sueldo = puestoExistente ? puestoExistente.sueldoDiario : Number(sueldoDiario)
+    if (!nombre.trim() || !area.trim() || !puesto.trim() || !sueldo || sueldo <= 0 || !fechaIngreso) {
+      setError(puestoExistente
+        ? 'Completa nombre, área, puesto y fecha de ingreso'
+        : 'Completa nombre, área, puesto, fecha de ingreso y el sueldo diario del puesto nuevo')
       return
     }
     setGuardando(true)
     setError('')
     try {
       const { data, error } = await supabase.functions.invoke('rh-empleados', {
-        body: { action: 'crear', nombre: nombre.trim(), area: area.trim(), puesto: puesto.trim(), sueldoDiario: Number(sueldoDiario), fechaIngreso, nss: nss.trim() },
+        body: { action: 'crear', nombre: nombre.trim(), area: area.trim(), puesto: puesto.trim(), sueldoDiario: sueldo, fechaIngreso, nss: nss.trim() },
       })
       if (error) throw new Error(error.message)
       refrescarBI()
@@ -329,9 +334,15 @@ function ModalRegistrarEmpleado({ onClose, onGuardado }) {
                 {catalogos?.puestos?.map(p => <option key={p.nombre} value={p.nombre} />)}
               </datalist>
             </CampoCard>
-            <CampoCard label="Sueldo Diario">
-              <input type="number" value={sueldoDiario} onChange={e => setSueldoDiario(e.target.value)} placeholder="0.00" className={`${inputCampo} tabular-nums`} />
-            </CampoCard>
+            {puestoExistente ? (
+              <CampoCard label="Sueldo Diario" hint={`Según el puesto "${puesto}"`}>
+                <p className="text-center text-sm font-bold text-gray-700 tabular-nums">{formatMoney(puestoExistente.sueldoDiario)}</p>
+              </CampoCard>
+            ) : puesto.trim() ? (
+              <CampoCard label="Sueldo Diario" hint="Puesto nuevo — captúralo aquí">
+                <input type="number" value={sueldoDiario} onChange={e => setSueldoDiario(e.target.value)} placeholder="0.00" className={`${inputCampo} tabular-nums`} />
+              </CampoCard>
+            ) : null}
             <CampoCard label="Número de Colaborador" hint="Se asigna automático al guardar">
               <p className="text-center text-sm text-gray-300">###</p>
             </CampoCard>
