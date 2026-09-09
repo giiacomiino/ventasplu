@@ -1,11 +1,12 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requireRole } from '../_shared/bubble.ts'
 
-// Siembra/actualiza el catálogo nativo `proveedores` con los días de
-// crédito que ya existen en Bubble — de ahí en adelante esa tabla es la
-// fuente para el formulario de Compras. Nunca escribe en Bubble, solo lee.
-// Solo toca días de crédito: categoría y tipo de producto se aprenden
-// desde el propio formulario de registro, no se pisan aquí.
+// Siembra/actualiza el catálogo nativo `proveedores` desde Bubble. Nunca
+// escribe en Bubble, solo lee. Días de crédito siempre se actualiza desde
+// aquí (Bubble es la fuente). Categoría y tipo de producto solo se llenan
+// si el registro nativo todavía no los tiene — una vez que se "aprenden"
+// desde una factura real capturada aquí, eso manda sobre lo que diga
+// Bubble.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -18,11 +19,15 @@ Deno.serve(async (req) => {
 
     const filas = proveedoresBubble
       .map((p: any) => {
-        const nombre = (p.RazonSocial || p['Razón Social'] || p.Nombre || p.NombreProveedor || p['Nombre Proveedor'] || '').trim()
-        const dias = p['Días de crédito'] ?? p.DiasDeCredito ?? p['Dias de credito'] ?? p.DiasCredito ?? null
-        return nombre ? { nombre, dias_credito: typeof dias === 'number' ? dias : null } : null
+        const nombre = (p.NombreComercial || p['Razon Social'] || p['Razón Social'] || '').trim()
+        const dias = p.DiasCredito ?? null
+        const categoria = (p['Categoría'] || p.Categoria || '').trim() || null
+        const tipoProducto = (p.TipoDeProducto || '').trim() || null
+        return nombre
+          ? { nombre, dias_credito: typeof dias === 'number' ? dias : null, categoria, tipo_producto: tipoProducto }
+          : null
       })
-      .filter(Boolean) as { nombre: string; dias_credito: number | null }[]
+      .filter(Boolean) as { nombre: string; dias_credito: number | null; categoria: string | null; tipo_producto: string | null }[]
 
     // Diagnóstico: si Bubble no trae nada, o trae registros pero ninguno
     // matchea un campo de nombre conocido, esto muestra por qué — sin
@@ -46,11 +51,21 @@ Deno.serve(async (req) => {
 
     let actualizados = 0
     for (const fila of filas) {
-      const { data: existente } = await admin.from('proveedores').select('id').eq('nombre', fila.nombre).maybeSingle()
+      const { data: existente } = await admin.from('proveedores').select('id, categoria, tipo_producto').eq('nombre', fila.nombre).maybeSingle()
       if (existente) {
-        await admin.from('proveedores').update({ dias_credito: fila.dias_credito, updated_at: new Date().toISOString() }).eq('id', existente.id)
+        await admin.from('proveedores').update({
+          dias_credito: fila.dias_credito,
+          categoria: existente.categoria ?? fila.categoria,
+          tipo_producto: existente.tipo_producto ?? fila.tipo_producto,
+          updated_at: new Date().toISOString(),
+        }).eq('id', existente.id)
       } else {
-        await admin.from('proveedores').insert({ nombre: fila.nombre, dias_credito: fila.dias_credito })
+        await admin.from('proveedores').insert({
+          nombre: fila.nombre,
+          dias_credito: fila.dias_credito,
+          categoria: fila.categoria,
+          tipo_producto: fila.tipo_producto,
+        })
       }
       actualizados += 1
     }
