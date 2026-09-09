@@ -25,33 +25,48 @@ function colorRotacion(pct) {
   return GOOD
 }
 
-// Altas/bajas en verde/rojo sólido (eventos del mes) y HC activo en
-// punteado dorado (el nivel al cierre de cada mes) — mismo eje: las tres
-// series son "número de personas", así que compartirlo no distorsiona
-// nada, solo hace que altas/bajas se vean chicas frente al total de HC.
+// Dos ejes independientes: HC activo (izquierda, escala grande) y
+// altas/bajas (derecha, escala chica) — así se distingue el movimiento
+// mes a mes de altas/bajas, que si compartieran eje con el HC total
+// quedarían casi planas.
 function TendenciaHCChart({ serie }) {
   const [hover, setHover] = useState(null)
-  const W = 1000, H = 260, PAD_X = 8, PAD_TOP = 20, PAD_BOTTOM = 10
+  const W = 1000, H = 260, PAD_L = 34, PAD_R = 34, PAD_TOP = 20, PAD_BOTTOM = 10
 
-  const valores = serie.flatMap(s => [s.altas, s.bajas, s.hcActivo])
-  const max = Math.max(...valores, 1) * 1.12
+  const maxHC = Math.max(...serie.map(s => s.hcActivo), 1) * 1.15
+  const maxEventos = Math.max(...serie.flatMap(s => [s.altas, s.bajas]), 1) * 1.2
 
-  const x = i => PAD_X + (i / Math.max(serie.length - 1, 1)) * (W - PAD_X * 2)
-  const y = v => H - PAD_BOTTOM - (v / max) * (H - PAD_TOP - PAD_BOTTOM)
-  const linea = campo => serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(s[campo]).toFixed(1)}`).join(' ')
+  const x = i => PAD_L + (i / Math.max(serie.length - 1, 1)) * (W - PAD_L - PAD_R)
+  const yHC = v => H - PAD_BOTTOM - (v / maxHC) * (H - PAD_TOP - PAD_BOTTOM)
+  const yEv = v => H - PAD_BOTTOM - (v / maxEventos) * (H - PAD_TOP - PAD_BOTTOM)
+  const lineaHC = serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${yHC(s.hcActivo).toFixed(1)}`).join(' ')
+  const lineaAltas = serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${yEv(s.altas).toFixed(1)}`).join(' ')
+  const lineaBajas = serie.map((s, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${yEv(s.bajas).toFixed(1)}`).join(' ')
 
   const hoverInfo = hover != null ? serie[hover] : null
+  const niveles = [0.25, 0.5, 0.75, 1]
 
   return (
     <div>
       <div className="relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ aspectRatio: `${W} / ${H}` }}>
-          {[0.25, 0.5, 0.75, 1].map(f => (
-            <line key={f} x1={PAD_X} x2={W - PAD_X} y1={y(max * f)} y2={y(max * f)} stroke="#f1f0ec" strokeWidth={1} />
+          {niveles.map(f => (
+            <line key={f} x1={PAD_L} x2={W - PAD_R} y1={yHC(maxHC * f)} y2={yHC(maxHC * f)} stroke="#f1f0ec" strokeWidth={1} />
           ))}
-          <path d={linea('hcActivo')} fill="none" stroke={GOLD_RAMP[1]} strokeWidth={2.25} strokeDasharray="7 5" strokeLinecap="round" />
-          <path d={linea('altas')} fill="none" stroke={GOOD} strokeWidth={2} strokeLinecap="round" />
-          <path d={linea('bajas')} fill="none" stroke={CRITICAL} strokeWidth={2} strokeLinecap="round" />
+          {niveles.map(f => (
+            <text key={`l-${f}`} x={PAD_L - 8} y={yHC(maxHC * f)} textAnchor="end" dominantBaseline="middle" fontSize="13" fill={GOLD_RAMP[1]} className="tabular-nums">
+              {Math.round(maxHC * f)}
+            </text>
+          ))}
+          {niveles.map(f => (
+            <text key={`r-${f}`} x={W - PAD_R + 8} y={yEv(maxEventos * f)} textAnchor="start" dominantBaseline="middle" fontSize="13" fill="#9ca3af" className="tabular-nums">
+              {Math.round(maxEventos * f)}
+            </text>
+          ))}
+
+          <path d={lineaHC} fill="none" stroke={GOLD_RAMP[1]} strokeWidth={2.25} strokeDasharray="7 5" strokeLinecap="round" />
+          <path d={lineaAltas} fill="none" stroke={GOOD} strokeWidth={2} strokeLinecap="round" />
+          <path d={lineaBajas} fill="none" stroke={CRITICAL} strokeWidth={2} strokeLinecap="round" />
 
           {serie.map((s, i) => (
             <rect
@@ -73,15 +88,15 @@ function TendenciaHCChart({ serie }) {
           </div>
         )}
       </div>
-      <div className="flex gap-1 sm:gap-3 mt-2">
+      <div className="flex mt-2" style={{ paddingLeft: `${(PAD_L / W) * 100}%`, paddingRight: `${(PAD_R / W) * 100}%` }}>
         {serie.map((s, i) => (
           <div key={i} className="flex-1 text-center text-[10px] text-gray-400 font-medium">{MESES_CORTOS[s.mes]}</div>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-gray-50 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: GOOD }} /> Altas</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: CRITICAL }} /> Bajas</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full border-t-2 border-dashed" style={{ borderColor: GOLD_RAMP[1] }} /> HC activo</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: GOOD }} /> Altas <span className="text-gray-300">(eje derecho)</span></span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full" style={{ background: CRITICAL }} /> Bajas <span className="text-gray-300">(eje derecho)</span></span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full border-t-2 border-dashed" style={{ borderColor: GOLD_RAMP[1] }} /> HC activo <span className="text-gray-300">(eje izquierdo)</span></span>
       </div>
     </div>
   )
