@@ -168,7 +168,6 @@ export default function BIRHAsistencia() {
                   {DIAS_CORTOS.map(d => (
                     <th key={d} className="px-2 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center min-w-[110px]">{d}</th>
                   ))}
-                  <th className="px-3 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center">Vacaciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,7 +176,7 @@ export default function BIRHAsistencia() {
                   return (
                     <Fragment key={`area-${grupo.area}`}>
                       <tr className="bg-gray-50 cursor-pointer select-none" onClick={() => toggleArea(grupo.area)}>
-                        <td colSpan={9} className="px-4 py-2 text-[11px] font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
+                        <td colSpan={8} className="px-4 py-2 text-[11px] font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
                           <span className="inline-flex items-center gap-1.5">
                             <ChevronDown size={13} className={`transition-transform ${colapsada ? '-rotate-90' : ''}`} />
                             {grupo.area} · {grupo.total}
@@ -187,7 +186,7 @@ export default function BIRHAsistencia() {
                       {!colapsada && grupo.puestos.map(p => (
                         <Fragment key={`puesto-${grupo.area}-${p.puesto}`}>
                           <tr>
-                            <td colSpan={9} className="px-6 py-1.5 text-[11px] font-semibold text-gray-400 sticky left-0 bg-white">
+                            <td colSpan={8} className="px-6 py-1.5 text-[11px] font-semibold text-gray-400 sticky left-0 bg-white">
                               {p.puesto}
                             </td>
                           </tr>
@@ -205,11 +204,6 @@ export default function BIRHAsistencia() {
                                   />
                                 </td>
                               ))}
-                              <td className="px-3 py-2 text-center">
-                                <span className="text-xs font-bold text-gray-600 tabular-nums">
-                                  {emp.saldoVacaciones.restantes}/{emp.saldoVacaciones.correspondientes}
-                                </span>
-                              </td>
                             </tr>
                           ))}
                         </Fragment>

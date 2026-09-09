@@ -153,8 +153,8 @@ export default function BIRH() {
               </div>
             </DomainCard>
 
-            <DomainCard to="/rh/asistencia" titulo="Asistencia semanal" sub="Registra trabajo, descansos, vacaciones y faltas por empleado">
-              <p className="text-sm text-gray-400">Cuadrícula semanal editable, con saldo de vacaciones por ley calculado por antigüedad.</p>
+            <DomainCard to="/rh/asistencia" titulo="Asistencia semanal" sub="Registra descansos, vacaciones, faltas e incapacidades por empleado">
+              <p className="text-sm text-gray-400">Cuadrícula semanal editable, agrupada por área y puesto.</p>
             </DomainCard>
           </div>
         </>

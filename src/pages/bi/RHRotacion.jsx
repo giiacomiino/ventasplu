@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { llamar, CRITICAL, GOOD } from './shared'
+import { llamar, CRITICAL, GOOD, GOLD_RAMP } from './shared'
 import { Card, PageHeader, KpiTile, SectionHeader, LoadingState, ErrorState, EmptyState } from './ui'
 
 function colorRotacion(pct) {
@@ -92,6 +92,8 @@ export default function BIRHRotacion() {
                     <th className="text-left px-6 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Nombre</th>
                     <th className="text-left px-6 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Puesto</th>
                     <th className="text-right px-6 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Antigüedad</th>
+                    <th className="text-right px-6 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Vacaciones</th>
+                    <th className="text-right px-6 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Disponibles</th>
                     <th className="text-right px-6 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Estatus</th>
                   </tr>
                 </thead>
@@ -101,6 +103,12 @@ export default function BIRHRotacion() {
                       <td className="px-6 py-3 text-gray-700 font-medium">{c.nombre}</td>
                       <td className="px-6 py-3 text-gray-500">{c.puesto}</td>
                       <td className="px-6 py-3 text-right text-gray-500 tabular-nums">{c.antiguedadMeses} meses</td>
+                      <td className="px-6 py-3 text-right text-gray-500 tabular-nums">
+                        {c.vacaciones ? `${c.vacaciones.correspondientes} días` : '—'}
+                      </td>
+                      <td className="px-6 py-3 text-right font-bold tabular-nums" style={{ color: c.vacaciones ? GOLD_RAMP[1] : '#9ca3af' }}>
+                        {c.vacaciones ? `${c.vacaciones.disponibles} días` : '—'}
+                      </td>
                       <td className="px-6 py-3 text-right">
                         <span
                           className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold"

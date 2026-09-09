@@ -1,34 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsHeaders, json, bubbleEnv, bubbleGetAll, conOrg, requirePermiso } from '../_shared/bubble.ts'
 
-// Días de vacaciones por año de servicio cumplido, Ley Federal del
-// Trabajo (art. 76): 12/14/16/18/20 los primeros 5 años, +2 cada 5 años
-// después. El periodo de cada empleado corre por su aniversario de
-// ingreso, no por año calendario.
-const DIAS_VACACIONES_LFT = [12, 14, 16, 18, 20]
-
-function diasVacacionesPorAnio(anioServicio: number): number {
-  if (anioServicio <= 0) return 0
-  if (anioServicio <= 5) return DIAS_VACACIONES_LFT[anioServicio - 1]
-  const bloque = Math.ceil((anioServicio - 5) / 5)
-  return 20 + bloque * 2
-}
-
-function periodoAniversarioActual(fechaIngreso: Date, hoy: Date) {
-  const anioIngreso = fechaIngreso.getUTCFullYear()
-  const mes = fechaIngreso.getUTCMonth()
-  const dia = fechaIngreso.getUTCDate()
-
-  let aniosCumplidos = hoy.getUTCFullYear() - anioIngreso
-  let ultimoAniversario = new Date(Date.UTC(hoy.getUTCFullYear(), mes, dia))
-  if (hoy < ultimoAniversario) {
-    aniosCumplidos -= 1
-    ultimoAniversario = new Date(Date.UTC(hoy.getUTCFullYear() - 1, mes, dia))
-  }
-  const siguienteAniversario = new Date(Date.UTC(ultimoAniversario.getUTCFullYear() + 1, mes, dia))
-  return { aniosCumplidos, inicio: ultimoAniversario, fin: siguienteAniversario }
-}
-
 function fechaISO(d: Date) {
   return d.toISOString().slice(0, 10)
 }
@@ -77,19 +49,6 @@ Deno.serve(async (req) => {
       const registroPorClave = new Map<string, string>()
       for (const r of registros ?? []) registroPorClave.set(`${r.empleado_bubble_id}:${r.fecha}`, r.estado)
 
-      const hoy = new Date()
-      const { data: vacacionesTomadas, error: errorVac } = await admin
-        .from('rh_asistencias')
-        .select('empleado_bubble_id, fecha')
-        .eq('estado', 'vacaciones')
-      if (errorVac) return json({ error: errorVac.message }, 400)
-
-      const vacacionesPorEmpleado = new Map<string, string[]>()
-      for (const v of vacacionesTomadas ?? []) {
-        if (!vacacionesPorEmpleado.has(v.empleado_bubble_id)) vacacionesPorEmpleado.set(v.empleado_bubble_id, [])
-        vacacionesPorEmpleado.get(v.empleado_bubble_id)!.push(v.fecha)
-      }
-
       const resumenSemana: Record<string, number> = { trabajo: 0, descanso: 0, vacaciones: 0, falta: 0, incapacidad: 0, permiso: 0 }
 
       const empleadosResp = activos.map((e: any) => {
@@ -100,22 +59,12 @@ Deno.serve(async (req) => {
           return { fecha, estado }
         })
 
-        let saldoVacaciones = { correspondientes: 0, tomados: 0, restantes: 0 }
-        if (e.FechaIngreso) {
-          const { aniosCumplidos, inicio, fin } = periodoAniversarioActual(new Date(e.FechaIngreso), hoy)
-          const correspondientes = diasVacacionesPorAnio(aniosCumplidos)
-          const fechasVac = vacacionesPorEmpleado.get(e._id) ?? []
-          const tomados = fechasVac.filter(f => f >= fechaISO(inicio) && f < fechaISO(fin)).length
-          saldoVacaciones = { correspondientes, tomados, restantes: Math.max(correspondientes - tomados, 0) }
-        }
-
         return {
           empleadoBubbleId: e._id,
           nombre,
           area: areaPorId.get(e['Área']) ?? 'Sin área',
           puesto: puestoPorId.get(e.Puesto) ?? 'Sin puesto',
           dias,
-          saldoVacaciones,
         }
       }).sort((a, b) => a.nombre.localeCompare(b.nombre))
 
