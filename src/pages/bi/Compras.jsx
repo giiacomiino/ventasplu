@@ -22,7 +22,8 @@ export default function Compras() {
         throw new Error(detalle?.error || error.message)
       }
       if (data?.error) throw new Error(data.error)
-      setMensajeSync(`${data.sincronizados} proveedores sincronizados desde Bubble`)
+      const detalle = data.diagnostico ? ` — ${data.diagnostico}${data.camposDeEjemplo ? ` Campos: ${data.camposDeEjemplo.join(', ')}` : ''}` : ''
+      setMensajeSync(`${data.sincronizados} proveedores sincronizados desde Bubble${detalle}`)
       refrescarBI()
     } catch (e) {
       setMensajeSync(e.message)
