@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ChevronRight, AlertTriangle, CheckCircle2, Clock, RefreshCw, Gauge } from 'lucide-react'
 import { formatMoney } from '../../utils/formatters'
 import { format } from 'date-fns'
@@ -242,17 +242,6 @@ export default function BIOverview() {
       }
     }
     topPlu = flat.sort((a, b) => b.monto - a.monto).slice(0, 3)
-  }
-
-  // Si a alguien le corresponde ver un solo módulo (y no tiene 'dashboard',
-  // que es la señal explícita de querer la vista consolidada), mejor
-  // mandarlo directo al overview de ese módulo — ya está diseñado
-  // completo para ese caso, en vez de mostrarle una versión resumida y
-  // suelta dentro del panel general.
-  const RUTA_MODULO = { ventas: '/ventas', pagos: '/pagos', rh: '/rh', proveedores: '/proveedores', presupuesto: '/presupuesto', pnl: '/pnl' }
-  const modulosActivos = profile ? Object.keys(RUTA_MODULO).filter(m => puede(m)) : []
-  if (profile && !esOwner && !puede('dashboard') && modulosActivos.length === 1) {
-    return <Navigate to={RUTA_MODULO[modulosActivos[0]]} replace />
   }
 
   return (

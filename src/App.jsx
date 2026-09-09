@@ -86,6 +86,34 @@ function SoloPermiso({ seccion }) {
   return <Outlet />
 }
 
+// El Dashboard general (resumen de todo) es solo para quien tiene ese
+// permiso marcado explícitamente (owner lo tiene siempre) — es la señal
+// de "quiero la vista consolidada". Todos los demás caen directo a su
+// propio módulo principal: no tiene caso mandarlos a un dashboard
+// genérico que van a ver casi vacío. ventas_plu queda fuera de esta
+// lista a propósito — casi todos lo tienen marcado por default, así que
+// si se incluyera aquí, alguien de RH/Pagos/Compras siempre caería en
+// "/" en vez de a su módulo real.
+const ORDEN_LANDING_MODULO = [
+  { seccion: 'rh', ruta: '/rh' },
+  { seccion: 'pagos', ruta: '/pagos' },
+  { seccion: 'compras', ruta: '/compras' },
+  { seccion: 'proveedores', ruta: '/proveedores' },
+  { seccion: 'presupuesto', ruta: '/presupuesto' },
+  { seccion: 'ventas', ruta: '/ventas' },
+  { seccion: 'pnl', ruta: '/pnl' },
+]
+
+function SoloDashboard() {
+  const { profile } = useAuth()
+  const tieneAcceso = profile?.rol === 'owner' || profile?.permisos?.dashboard === true
+  if (profile && !tieneAcceso) {
+    const destino = ORDEN_LANDING_MODULO.find(m => profile?.permisos?.[m.seccion] === true)?.ruta ?? rutaDisponible(profile)
+    return destino ? <Navigate to={destino} replace /> : <SinAcceso />
+  }
+  return <Outlet />
+}
+
 function SoloOwner() {
   const { profile } = useAuth()
   if (profile && profile.rol !== 'owner') {
@@ -116,7 +144,7 @@ export default function App() {
           <Route path="/" element={<VentasPlu />} />
         </Route>
 
-        <Route element={<SoloPermiso seccion={['dashboard', 'ventas', 'pagos', 'rh', 'proveedores', 'presupuesto', 'pnl']} />}>
+        <Route element={<SoloDashboard />}>
           <Route path="/dashboard" element={<BIOverview />} />
         </Route>
 
