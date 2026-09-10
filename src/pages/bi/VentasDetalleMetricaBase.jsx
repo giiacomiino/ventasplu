@@ -193,7 +193,7 @@ export function DetalleMetrica({ campo, titulo, sub, color = GOLD_RAMP[1] }) {
     ? datos.serieDiaria.filter(d => Number(d.fecha.slice(5, 7)) - 1 === mesSeleccionado)
     : []
   const nombreMes = mesSeleccionado != null
-    ? format(new Date(Date.UTC(anio, mesSeleccionado, 1)), 'MMMM yyyy', { locale: es })
+    ? format(new Date(anio, mesSeleccionado, 1, 12), 'MMMM yyyy', { locale: es })
     : ''
 
   return (
