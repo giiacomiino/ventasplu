@@ -50,7 +50,11 @@ function MensualChart({ serie, color, mesSeleccionado, onClickMes }) {
   const hayFiltro = mesSeleccionado != null
 
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="overflow-x-auto -mx-1 px-1 pt-14">
+      {/* pt-14 reserva espacio arriba: overflow-x-auto también recorta el
+          eje vertical (comportamiento del navegador), así que el tooltip
+          que aparece encima de la barra necesita ese margen o queda
+          invisible fuera del área visible. */}
       <div style={{ minWidth: '720px' }}>
         <div className="relative h-56 flex items-end gap-2">
           {serie.map((m, i) => {
@@ -102,7 +106,11 @@ function DiariaMesChart({ dias, color }) {
   const colorBarra = sombrear(color)
 
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="overflow-x-auto -mx-1 px-1 pt-14">
+      {/* pt-14 reserva espacio arriba: overflow-x-auto también recorta el
+          eje vertical (comportamiento del navegador), así que el tooltip
+          que aparece encima de la barra necesita ese margen o queda
+          invisible fuera del área visible. */}
       <div style={{ minWidth: `${Math.max(dias.length * 24, 480)}px` }}>
         <div className="relative h-56 flex items-end gap-1">
           {dias.map((d, i) => {
