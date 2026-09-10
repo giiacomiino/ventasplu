@@ -15,24 +15,32 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 async function extraerLineas(archivo) {
   const buffer = await archivo.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
-  const page = await pdf.getPage(1)
-  const contenido = await page.getTextContent()
+  try {
+    const page = await pdf.getPage(1)
+    const contenido = await page.getTextContent()
 
-  const items = contenido.items
-    .map(it => ({ texto: it.str, x: it.transform[4], y: it.transform[5] }))
-    .filter(it => it.texto.trim() !== '')
+    const items = contenido.items
+      .map(it => ({ texto: it.str, x: it.transform[4], y: it.transform[5] }))
+      .filter(it => it.texto.trim() !== '')
 
-  const TOLERANCIA_Y = 3
-  const filas = []
-  for (const it of items) {
-    let fila = filas.find(f => Math.abs(f.y - it.y) < TOLERANCIA_Y)
-    if (!fila) { fila = { y: it.y, items: [] }; filas.push(fila) }
-    fila.items.push(it)
+    const TOLERANCIA_Y = 3
+    const filas = []
+    for (const it of items) {
+      let fila = filas.find(f => Math.abs(f.y - it.y) < TOLERANCIA_Y)
+      if (!fila) { fila = { y: it.y, items: [] }; filas.push(fila) }
+      fila.items.push(it)
+    }
+    filas.sort((a, b) => b.y - a.y) // de arriba hacia abajo
+    for (const f of filas) f.items.sort((a, b) => a.x - b.x)
+
+    return filas.map(f => f.items.map(i => i.texto).join(' ').replace(/\s+/g, ' ').trim())
+  } finally {
+    // pdf.js reserva memoria del lado del worker por cada documento
+    // abierto; sin liberarlo explícitamente, procesar cientos de PDFs
+    // seguidos (carga masiva) va acumulando memoria hasta tronar la
+    // pestaña — destroy() lo libera antes de pasar al siguiente archivo.
+    await pdf.destroy()
   }
-  filas.sort((a, b) => b.y - a.y) // de arriba hacia abajo
-  for (const f of filas) f.items.sort((a, b) => a.x - b.x)
-
-  return filas.map(f => f.items.map(i => i.texto).join(' ').replace(/\s+/g, ' ').trim())
 }
 
 function numero(str) {
@@ -228,6 +236,5 @@ export async function parsearReporteVenta(archivo) {
     categorias: extraerCategorias(lineas),
     zonas: extraerZonas(lineas),
     pagos: extraerPagos(lineas),
-    lineasCrudas: lineas,
   }
 }
