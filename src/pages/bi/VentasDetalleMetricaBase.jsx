@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatMoney } from '../../utils/formatters'
@@ -229,8 +229,11 @@ export function DetalleMetrica({ campo, titulo, sub, color = GOLD_RAMP[1] }) {
                 title={`${titulo} por día`}
                 sub={<span className="capitalize">{nombreMes}</span>}
                 right={
-                  <button onClick={() => setMesSeleccionado(null)} className="text-xs font-semibold text-gray-400 hover:text-gray-700">
-                    Ver todo el año ✕
+                  <button
+                    onClick={() => setMesSeleccionado(null)}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                  >
+                    Ver todo el año <X size={12} />
                   </button>
                 }
               />
