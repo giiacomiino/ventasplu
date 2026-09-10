@@ -22,6 +22,15 @@ function formatK(n) {
   return `$${(n / 1000).toFixed(0)}k`
 }
 
+// Oscurece un color hex un poco — para que el detalle diario se vea como
+// un tono relacionado pero distinto del color base de la métrica, en vez
+// de ser idéntico a la gráfica mensual de arriba.
+function sombrear(hex, factor = 0.72) {
+  const h = hex.replace('#', '')
+  const canal = (i) => Math.round(parseInt(h.slice(i, i + 2), 16) * factor)
+  return `#${[canal(0), canal(2), canal(4)].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('')}`
+}
+
 function SelectorAnio({ anio, setAnio }) {
   const anioActual = new Date().getFullYear()
   return (
@@ -90,11 +99,12 @@ function MensualChart({ serie, color, mesSeleccionado, onClickMes }) {
 function DiariaMesChart({ dias, color }) {
   const [hover, setHover] = useState(null)
   const max = Math.max(...dias.map(d => d.valor ?? 0), 1) * 1.15
+  const colorBarra = sombrear(color)
 
   return (
     <div className="overflow-x-auto -mx-1 px-1">
       <div style={{ minWidth: `${Math.max(dias.length * 24, 480)}px` }}>
-        <div className="relative h-48 flex items-end gap-1">
+        <div className="relative h-56 flex items-end gap-1">
           {dias.map((d, i) => {
             const valor = d.valor ?? 0
             const h = Math.max((valor / max) * 100, valor ? 4 : 0)
@@ -109,7 +119,12 @@ function DiariaMesChart({ dias, color }) {
                     <p className="text-gray-300 tabular-nums">{formatMoney(valor)}</p>
                   </Tooltip>
                 )}
-                <div className="w-full rounded-t transition-opacity" style={{ height: `${h}%`, background: color, opacity: hover === i ? 0.75 : 1 }} />
+                {valor > 0 && (
+                  <span className="text-[9px] font-bold tabular-nums whitespace-nowrap mb-1" style={{ color: colorBarra }}>
+                    {formatK(valor)}
+                  </span>
+                )}
+                <div className="w-full rounded-t transition-opacity" style={{ height: `${h}%`, background: colorBarra, opacity: hover === i ? 0.75 : 1 }} />
               </div>
             )
           })}
