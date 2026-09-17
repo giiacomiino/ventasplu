@@ -14,7 +14,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 // línea aunque el PDF los haya dibujado en momentos distintos del stream.
 async function extraerLineas(archivo) {
   const buffer = await archivo.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
+  const loadingTask = pdfjsLib.getDocument({ data: buffer })
+  const pdf = await loadingTask.promise
   try {
     const page = await pdf.getPage(1)
     const contenido = await page.getTextContent()
@@ -38,8 +39,9 @@ async function extraerLineas(archivo) {
     // pdf.js reserva memoria del lado del worker por cada documento
     // abierto; sin liberarlo explícitamente, procesar cientos de PDFs
     // seguidos (carga masiva) va acumulando memoria hasta tronar la
-    // pestaña — destroy() lo libera antes de pasar al siguiente archivo.
-    await pdf.destroy()
+    // pestaña. destroy() vive en el loadingTask (lo que regresa
+    // getDocument()), no en el PDFDocumentProxy que resuelve su .promise.
+    await loadingTask.destroy()
   }
 }
 
